@@ -29,6 +29,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: adversary-scan
+  cancel-in-progress: true
+
 jobs:
   adversary-scan:
     runs-on: ubuntu-latest
@@ -39,7 +43,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
@@ -77,10 +81,10 @@ jobs:
           SCAN_DURATION=$(( $(date +%s) - SCAN_START ))
 
           # Parse severity counts from output
-          CRITICAL=$(grep -c '\[CRITICAL\]' adversary-scan.log 2>/dev/null || echo 0)
-          HIGH=$(grep -c '\[HIGH\]' adversary-scan.log 2>/dev/null || echo 0)
-          MEDIUM=$(grep -c '\[MEDIUM\]' adversary-scan.log 2>/dev/null || echo 0)
-          LOW=$(grep -c '\[LOW\]' adversary-scan.log 2>/dev/null || echo 0)
+          CRITICAL=$(grep -c '\[CRITICAL\]' adversary-scan.log 2>/dev/null) || CRITICAL=0
+          HIGH=$(grep -c '\[HIGH\]' adversary-scan.log 2>/dev/null) || HIGH=0
+          MEDIUM=$(grep -c '\[MEDIUM\]' adversary-scan.log 2>/dev/null) || MEDIUM=0
+          LOW=$(grep -c '\[LOW\]' adversary-scan.log 2>/dev/null) || LOW=0
 
           echo "Findings: ${CRITICAL} critical, ${HIGH} high, ${MEDIUM} medium, ${LOW} low"
 
@@ -94,7 +98,7 @@ jobs:
 
       - name: Upload scan artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: adversary-scan-results
           path: |
@@ -106,40 +110,40 @@ jobs:
         if: always() && env.SLACK_WEBHOOK_URL != ''
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SCAN_CRITICAL: ${{ steps.scan.outputs.critical || 0 }}
+          SCAN_HIGH: ${{ steps.scan.outputs.high || 0 }}
+          SCAN_MEDIUM: ${{ steps.scan.outputs.medium || 0 }}
+          SCAN_LOW: ${{ steps.scan.outputs.low || 0 }}
+          SCAN_DURATION_SECS: ${{ steps.scan.outputs.scan_duration || 0 }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          CRITICAL="${{ steps.scan.outputs.critical || 0 }}"
-          HIGH="${{ steps.scan.outputs.high || 0 }}"
-          MEDIUM="${{ steps.scan.outputs.medium || 0 }}"
-          LOW="${{ steps.scan.outputs.low || 0 }}"
-          SCAN_DURATION="${{ steps.scan.outputs.scan_duration || 0 }}"
-
-          REPO="${{ github.repository }}"
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          NL=$'\n'
 
           # Traffic-light logic
-          if [[ $(( CRITICAL + HIGH )) -gt 0 ]]; then
+          if [[ $(( SCAN_CRITICAL + SCAN_HIGH )) -gt 0 ]]; then
             ICON=":red_circle:"
             MSG="${ICON} *Adversary Security Scan* — ${REPO} (${SCAN_MODE})"
-            MSG+="\n*${CRITICAL}* critical, *${HIGH}* high, *${MEDIUM}* medium, *${LOW}* low"
-          elif [[ $(( MEDIUM + LOW )) -gt 0 ]]; then
+            MSG+="${NL}*${SCAN_CRITICAL}* critical, *${SCAN_HIGH}* high, *${SCAN_MEDIUM}* medium, *${SCAN_LOW}* low"
+          elif [[ $(( SCAN_MEDIUM + SCAN_LOW )) -gt 0 ]]; then
             ICON=":large_yellow_circle:"
             MSG="${ICON} *Adversary Security Scan* — ${REPO} (${SCAN_MODE})"
-            MSG+="\n*${MEDIUM}* medium, *${LOW}* low"
+            MSG+="${NL}*${SCAN_MEDIUM}* medium, *${SCAN_LOW}* low"
           else
             ICON=":large_green_circle:"
             MSG="${ICON} *Adversary Security Scan* — ${REPO} (${SCAN_MODE}) — No findings."
           fi
 
           # Format duration
-          MINS=$(( SCAN_DURATION / 60 ))
-          SECS=$(( SCAN_DURATION % 60 ))
+          MINS=$(( SCAN_DURATION_SECS / 60 ))
+          SECS=$(( SCAN_DURATION_SECS % 60 ))
           if [[ ${MINS} -gt 0 ]]; then
             DURATION_STR="${MINS}m ${SECS}s"
           else
             DURATION_STR="${SECS}s"
           fi
 
-          MSG+="\nDuration: ${DURATION_STR} | <${RUN_URL}|View Run>"
+          MSG+="${NL}Duration: ${DURATION_STR} | <${RUN_URL}|View Run>"
 
           PAYLOAD=$(jq -nc --arg text "${MSG}" '{"text": $text}')
 
