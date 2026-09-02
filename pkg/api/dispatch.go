@@ -28,14 +28,20 @@ type createRequest struct {
 }
 
 type createResponse struct {
-	ID             string          `json:"id"`
-	Status         string          `json:"status"`
-	TargetCluster  string          `json:"target_cluster"`
-	ExecutedAction string          `json:"executed_action,omitempty"`
-	ExecutionMode  string          `json:"execution_mode"`
-	Output         json.RawMessage `json:"output,omitempty"`
-	Logs           string          `json:"logs,omitempty"`
-	DurationMs     *int64          `json:"duration_ms,omitempty"`
+	ID              string          `json:"id"`
+	Action          string          `json:"action"`
+	RequestedAction string          `json:"requested_action,omitempty"`
+	TargetCluster   string          `json:"target_cluster"`
+	Operator        string          `json:"operator"`
+	Status          string          `json:"status"`
+	ExecutionMode   string          `json:"execution_mode"`
+	Scope           string          `json:"scope"`
+	Type            string          `json:"type"`
+	DryRun          bool            `json:"dry_run"`
+	Force           bool            `json:"force"`
+	DurationMs      *int64          `json:"duration_ms,omitempty"`
+	Output          json.RawMessage `json:"output,omitempty"`
+	Logs            string          `json:"logs,omitempty"`
 }
 
 func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request, actionName string) {
@@ -223,21 +229,33 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request, actionNam
 				"durationMs":  int64(0),
 			})
 		writeJSON(w, http.StatusOK, createResponse{
-			ID:             executionID,
-			TargetCluster:  h.cfg.TargetCluster,
-			Status:         string(store.StatusFailed),
-			ExecutedAction: executedAction,
-			ExecutionMode:  execMode,
+			ID:              executionID,
+			Action:          executedAction,
+			RequestedAction: requestedAction,
+			TargetCluster:   h.cfg.TargetCluster,
+			Operator:        operator,
+			Status:          string(store.StatusFailed),
+			ExecutionMode:   execMode,
+			Scope:           meta.Scope,
+			Type:            meta.Type,
+			DryRun:          req.DryRun,
+			Force:           req.Force,
 		})
 		return
 	}
 
 	writeJSON(w, http.StatusAccepted, createResponse{
-		ID:             executionID,
-		TargetCluster:  h.cfg.TargetCluster,
-		Status:         string(store.StatusDispatched),
-		ExecutedAction: executedAction,
-		ExecutionMode:  execMode,
+		ID:              executionID,
+		Action:          executedAction,
+		RequestedAction: requestedAction,
+		TargetCluster:   h.cfg.TargetCluster,
+		Operator:        operator,
+		Status:          string(store.StatusDispatched),
+		ExecutionMode:   execMode,
+		Scope:           meta.Scope,
+		Type:            meta.Type,
+		DryRun:          req.DryRun,
+		Force:           req.Force,
 	})
 }
 
@@ -280,12 +298,18 @@ func (h *Handler) executeSyncAndRespond(w http.ResponseWriter, ctx context.Conte
 	}
 
 	resp := createResponse{
-		ID:             exec.ID,
-		TargetCluster:  h.cfg.TargetCluster,
-		Status:         string(finalStatus),
-		ExecutedAction: exec.Action,
-		ExecutionMode:  exec.ExecutionMode,
-		DurationMs:     &durationMs,
+		ID:              exec.ID,
+		Action:          exec.Action,
+		RequestedAction: exec.RequestedAction,
+		TargetCluster:   h.cfg.TargetCluster,
+		Operator:        exec.Operator,
+		Status:          string(finalStatus),
+		ExecutionMode:   exec.ExecutionMode,
+		Scope:           exec.Scope,
+		Type:            exec.Type,
+		DryRun:          exec.DryRun,
+		Force:           exec.Force,
+		DurationMs:      &durationMs,
 	}
 	if result != nil {
 		if finalStatus == store.StatusSucceeded {
@@ -317,3 +341,4 @@ func validateParams(meta actions.ActionMetadata, params map[string]string) error
 
 	return nil
 }
+

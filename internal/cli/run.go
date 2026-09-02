@@ -124,7 +124,7 @@ func runAction(ctx context.Context, global *GlobalOptions, opts *runOptions, act
 		return fmt.Errorf("dispatch failed: %w", err)
 	}
 
-	tags := formatTags(action, resp.ExecutedAction, opts.force, opts.dryRun)
+	tags := formatTags(action, resp.Action, opts.force, opts.dryRun)
 
 	isAsync := resp.ExecutionMode == "async"
 	fireAndForget := opts.noWait || (isAsync && !opts.wait)
@@ -145,12 +145,20 @@ func runAction(ctx context.Context, global *GlobalOptions, opts *runOptions, act
 	if isTerminalStatus(resp.Status) {
 		if resp.Output.String() != "" || resp.Logs != "" {
 			exec := &client.Execution{
-				ID:            resp.ID,
-				Status:        resp.Status,
-				ExecutionMode: resp.ExecutionMode,
-				DurationMs:    resp.DurationMs,
-				Output:        resp.Output,
-				Logs:          resp.Logs,
+				ID:              resp.ID,
+				Action:          resp.Action,
+				RequestedAction: resp.RequestedAction,
+				TargetCluster:   resp.TargetCluster,
+				Operator:        resp.Operator,
+				Status:          resp.Status,
+				ExecutionMode:   resp.ExecutionMode,
+				Scope:           resp.Scope,
+				Type:            resp.Type,
+				DryRun:          resp.DryRun,
+				Force:           resp.Force,
+				DurationMs:      resp.DurationMs,
+				Output:          resp.Output,
+				Logs:            resp.Logs,
 			}
 			return printRunResult(global, exec)
 		}
