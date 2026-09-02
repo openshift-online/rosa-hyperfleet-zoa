@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/go-toolset:1.26.5-1787080706 AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:1.26.7-1788245275 AS builder
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 ARG ZOA_VERSION=0.2.0
@@ -22,7 +22,7 @@ RUN BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) && \
     -ldflags="-w -s -X ${VERSION_PKG}.Version=${ZOA_VERSION} -X ${VERSION_PKG}.GitCommit=${GIT_COMMIT} -X ${VERSION_PKG}.BuildDate=${BUILD_DATE}" \
     -o /workspace/zoa-lambda ./cmd/zoa-lambda/
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.8-1786987521
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.8-1788166357
 
 ARG VERSION=0.0.1
 ARG RELEASE=1
