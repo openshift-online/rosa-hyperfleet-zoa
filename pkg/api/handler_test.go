@@ -252,9 +252,15 @@ func defaultHeaders() map[string]string {
 // --- Tests ---
 
 func TestHandleCreate_WhenWriteCooldown_ItShouldReturn429(t *testing.T) {
+	// Cooldown is per (target, action, params) — mock must have matching params
 	execStore := &mockExecStore{
 		recentByTarget: []*store.Execution{
-			{ID: "recent-exec", Action: "test-write", Status: store.StatusSucceeded},
+			{
+				ID:     "recent-exec",
+				Action: "test-write",
+				Status: store.StatusSucceeded,
+				Params: map[string]string{"namespace": "default", "name": "pod-1"},
+			},
 		},
 	}
 	h := testHandler(execStore)
@@ -303,6 +309,63 @@ func TestHandleCreate_WhenForceBypassesCooldown_ItShouldCreateExecution(t *testi
 	}
 }
 
+func TestHandleCreate_WhenDifferentParams_ItShouldNotTriggerCooldown(t *testing.T) {
+	// Cooldown is per (target, action, params) — different params means different target workload
+	execStore := &mockExecStore{
+		recentByTarget: []*store.Execution{
+			{
+				ID:     "recent-exec",
+				Action: "test-write",
+				Status: store.StatusSucceeded,
+				Params: map[string]string{"namespace": "default", "name": "pod-1"},
+			},
+		},
+	}
+	h := testHandler(execStore)
+
+	// Same action, different params — should NOT be blocked by cooldown
+	body := createRequest{
+		Jira:   "JIRA-123",
+		Params: map[string]string{"namespace": "default", "name": "pod-2"}, // different name
+	}
+
+	rr := doRequest(h, "POST", "/api/v0/trusted-actions/test-write/run", body, defaultHeaders())
+
+	// Should NOT get 429 — different target workload
+	if rr.Code == http.StatusTooManyRequests {
+		t.Errorf("different params should not trigger cooldown, but got 429: %s", rr.Body.String())
+	}
+}
+
+func TestHandleCreate_WhenDryRunRecent_ItShouldNotTriggerCooldown(t *testing.T) {
+	// Dry-run executions don't count towards cooldown (no real mutation)
+	execStore := &mockExecStore{
+		recentByTarget: []*store.Execution{
+			{
+				ID:     "recent-exec",
+				Action: "test-write",
+				Status: store.StatusSucceeded,
+				Params: map[string]string{"namespace": "default", "name": "pod-1"},
+				DryRun: true, // dry-run execution
+			},
+		},
+	}
+	h := testHandler(execStore)
+
+	// Same params, but recent was dry-run — should NOT be blocked
+	body := createRequest{
+		Jira:   "JIRA-123",
+		Params: map[string]string{"namespace": "default", "name": "pod-1"},
+	}
+
+	rr := doRequest(h, "POST", "/api/v0/trusted-actions/test-write/run", body, defaultHeaders())
+
+	// Should NOT get 429 — dry-runs don't count
+	if rr.Code == http.StatusTooManyRequests {
+		t.Errorf("dry-run executions should not trigger cooldown, but got 429: %s", rr.Body.String())
+	}
+}
+
 func TestHandleCreate_WhenMaxConcurrentExceeded_ItShouldReturn429(t *testing.T) {
 	execStore := &mockExecStore{
 		activeCount: 10, // exceeds MaxConcurrentPerTarget=5
@@ -328,9 +391,15 @@ func TestHandleCreate_WhenMaxConcurrentExceeded_ItShouldReturn429(t *testing.T) 
 }
 
 func TestHandleCreate_WhenCooldownRejected_ItShouldRecordAuditWith429(t *testing.T) {
+	// Cooldown is per (target, action, params) — mock must have matching params
 	execStore := &mockExecStore{
 		recentByTarget: []*store.Execution{
-			{ID: "recent-exec", Action: "test-write", Status: store.StatusSucceeded},
+			{
+				ID:     "recent-exec",
+				Action: "test-write",
+				Status: store.StatusSucceeded,
+				Params: map[string]string{"namespace": "default", "name": "pod-1"},
+			},
 		},
 	}
 	auditCapture := &auditCapturingStoreHandler{}

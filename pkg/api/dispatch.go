@@ -109,7 +109,10 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request, actionNam
 	}
 
 	// Write cooldown check (prevents duplicate SRE requests at UX level)
-	if meta.Type == "write" && !req.Force {
+	// Cooldown is per (target, action, params) — different params means different target workload.
+	// - Dry-run executions don't trigger or count towards cooldown (no real mutation)
+	// - Force bypasses cooldown but doesn't affect what triggers cooldown
+	if meta.Type == "write" && !req.Force && !req.DryRun {
 		cooldown := h.cfg.WriteCooldownSeconds
 		if meta.WriteCooldownSeconds > 0 {
 			cooldown = meta.WriteCooldownSeconds
@@ -121,10 +124,13 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request, actionNam
 			writeError(w, http.StatusInternalServerError, "internal_error", "failed to check write cooldown")
 			return
 		}
-		if len(recent) > 0 {
+		// Filter to executions with matching params (same target workload)
+		// Exclude dry-runs (they don't count as real executions)
+		matching := filterMatchingParams(recent, req.Params)
+		if len(matching) > 0 {
 			h.recordAudit(r, http.StatusTooManyRequests, actionName, "", withJira(req.Jira), withForce(req.Force), withDryRun(req.DryRun))
 			writeError(w, http.StatusTooManyRequests, "write_cooldown",
-				fmt.Sprintf("action %q was executed within the last %ds; use force=true to override", actionName, cooldown))
+				fmt.Sprintf("action %q with these params was executed within the last %ds; use force=true to override", actionName, cooldown))
 			return
 		}
 	}
@@ -342,3 +348,33 @@ func validateParams(meta actions.ActionMetadata, params map[string]string) error
 	return nil
 }
 
+// filterMatchingParams filters executions to those with matching params.
+// - Excludes dry-run executions (they don't count towards cooldown)
+// - Matches all params exactly (cooldown is per target workload, not just action)
+func filterMatchingParams(executions []*store.Execution, params map[string]string) []*store.Execution {
+	var matching []*store.Execution
+	for _, e := range executions {
+		// Dry-runs don't count towards cooldown (no real mutation happened)
+		if e.DryRun {
+			continue
+		}
+		// Check if params match (same target workload)
+		if paramsMatch(e.Params, params) {
+			matching = append(matching, e)
+		}
+	}
+	return matching
+}
+
+// paramsMatch returns true if the two param maps have the same keys and values.
+func paramsMatch(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
+}
