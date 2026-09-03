@@ -1,5 +1,7 @@
-.PHONY: all build dist print-version clean install test test-e2e test-e2e-smoke fmt fmt-check vet lint verify tidy verify-mod \
-       image image-runner image-push image-push-runner help
+.PHONY: all build dist print-version clean install test test-e2e test-e2e-smoke \
+       fmt fmt-check vet lint verify tidy verify-mod \
+       image-lambda image-runner image-push-lambda image-push-runner images-push \
+       help
 
 BINARY_NAME = zoa
 BUILD_DIR   = ./bin
@@ -10,8 +12,8 @@ CLI_PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 HASH_CMD      := $(shell command -v sha256sum >/dev/null 2>&1 && echo sha256sum || echo "shasum -a 256")
 
 # Container images
-IMAGE_REPO        ?= quay.io/slopezz/zoa-lambda
-RUNNER_IMAGE_REPO ?= quay.io/slopezz/zoa-runner
+IMAGE_REPO        ?= quay.io/rrp-dev-ci/zoa-lambda
+RUNNER_IMAGE_REPO ?= quay.io/rrp-dev-ci/zoa-runner
 IMAGE_TAG         ?= latest
 GIT_COMMIT        = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
@@ -130,7 +132,6 @@ test-e2e: build
 test-e2e-smoke: build
 	$(call run_e2e_parallel,-timeout 5m -ginkgo.label-filter=smoke)
 
-
 # =============================================================================
 # Code Quality
 # =============================================================================
@@ -153,21 +154,19 @@ verify: fmt-check vet lint
 # Container Images
 # =============================================================================
 
-image:
+image-lambda:
 	$(CONTAINER_RUNTIME) build \
 		--platform linux/amd64 \
-		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
 		-t $(IMAGE_REPO):$(IMAGE_TAG) \
 		-f Containerfile .
 
 image-runner:
 	$(CONTAINER_RUNTIME) build \
 		--platform linux/amd64 \
-		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
 		-t $(RUNNER_IMAGE_REPO):$(IMAGE_TAG) \
 		-f Containerfile.runner .
 
-image-push: image
+image-push-lambda: image-lambda
 	$(CONTAINER_RUNTIME) push $(IMAGE_REPO):$(IMAGE_TAG)
 	$(CONTAINER_RUNTIME) tag $(IMAGE_REPO):$(IMAGE_TAG) $(IMAGE_REPO):$(GIT_COMMIT)
 	$(CONTAINER_RUNTIME) push $(IMAGE_REPO):$(GIT_COMMIT)
@@ -176,6 +175,11 @@ image-push-runner: image-runner
 	$(CONTAINER_RUNTIME) push $(RUNNER_IMAGE_REPO):$(IMAGE_TAG)
 	$(CONTAINER_RUNTIME) tag $(RUNNER_IMAGE_REPO):$(IMAGE_TAG) $(RUNNER_IMAGE_REPO):$(GIT_COMMIT)
 	$(CONTAINER_RUNTIME) push $(RUNNER_IMAGE_REPO):$(GIT_COMMIT)
+
+# Meta target — build + push both images in one command (dev workflow).
+# Each image-push-* target depends on the corresponding image-* build target,
+# so this single command builds and pushes everything.
+images-push: image-push-lambda image-push-runner
 
 # =============================================================================
 # Help
@@ -198,7 +202,8 @@ help:
 	@echo "  fmt                Format code"
 	@echo ""
 	@echo "Images:"
-	@echo "  image              Build zoa-lambda image (primary)"
-	@echo "  image-runner       Build zoa-runner image (async Jobs + CLI)"
-	@echo "  image-push         Build + push zoa-lambda"
-	@echo "  image-push-runner  Build + push zoa-runner"
+	@echo "  image-lambda       Build zoa-lambda image"
+	@echo "  image-runner       Build zoa-runner image"
+	@echo "  image-push-lambda  Build + push zoa-lambda (:latest + :commit)"
+	@echo "  image-push-runner  Build + push zoa-runner (:latest + :commit)"
+	@echo "  images-push        Build + push both images (single command for dev workflow)"
