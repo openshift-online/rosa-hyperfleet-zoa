@@ -21,6 +21,7 @@
 | Document | Description |
 |----------|-------------|
 | [Development Guide](development.md) | Build, test, lint, CI, releasing |
+| [End-to-End Testing](e2e-testing.md) | Deep/smoke tiers, running locally, CI image injection, AWS credentials |
 
 ## Documentation Philosophy
 

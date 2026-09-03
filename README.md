@@ -206,6 +206,8 @@ rosa-hyperfleet-zoa/
 │   ├── scheduler/        Reconciler, GC (EventBridge-triggered)
 │   ├── config/           Env-var configuration
 │   └── metrics/          CloudWatch EMF emission
+├── test/e2e/             E2E Ginkgo suite (deep + smoke)
+├── ci/                   CI scripts (lint, test, verify)
 ├── docs/                 Documentation
 ├── Containerfile         Lambda image (api + worker)
 ├── Containerfile.runner  Runner image (async K8s Jobs)
@@ -220,6 +222,8 @@ rosa-hyperfleet-zoa/
 | [CLI Reference](docs/cli-reference.md) | Commands, flags, examples |
 | [Trusted Actions Guide](docs/trusted-actions.md) | How to author new TAs in Go |
 | [Development Guide](docs/development.md) | Build, test, lint, CI |
+| [End-to-End Testing](docs/e2e-testing.md) | Deep/smoke test tiers, running locally against dev/CI environments, CI image injection |
+| [Konflux](docs/konflux.md) | Production image build pipelines, Quay repos |
 | [Lambda Model](docs/architecture/lambda-model.md) | Lambda functions, concurrency, and rationale |
 | [Timeout Tuning](docs/architecture/timeout-tuning.md) | Timeout layers and adjustment procedures |
 | [Implementation Details](docs/architecture/implementation.md) | Execution flows, env vars, safety controls |
@@ -228,10 +232,19 @@ rosa-hyperfleet-zoa/
 
 ```bash
 make test                          # Unit tests with race detection
-go test ./pkg/actions/ -run Conformance -v  # TA conformance gate
+make test-e2e                      # E2E deep suite (needs ZOA_RC_API_URL / ZOA_MC_API_URL)
+make test-e2e-smoke                # E2E smoke subset (~2min)
 ```
 
-The conformance test suite (`pkg/actions/conformance_test.go`) runs on every PR and enforces: required metadata, naming conventions, scope-RBAC consistency, write-TA safety rules, timeout ceiling compliance, parameter uniqueness, and test file existence for every registered TA.
+Two conformance gates ensure every Trusted Action stays tested:
+
+- **Unit conformance** (`pkg/actions/conformance_test.go`, runs on every PR via `make test`):
+  required metadata, naming conventions, scope-RBAC consistency, write-TA safety rules, timeout
+  ceiling compliance, parameter uniqueness, and unit test file existence.
+- **E2E conformance** (`test/e2e/conformance_test.go`, runs on every `make test-e2e`):
+  queries the live Lambda registry, verifies every registered TA has a `ta_*` e2e test file,
+  checks `knownActions` matches the live registry, and ensures smoke tests cover both `kube-api`
+  and `aws-api` scopes.
 
 ## Infrastructure
 
@@ -239,3 +252,4 @@ ZOA infrastructure (Terraform) lives in [rosa-hyperfleet](https://github.com/ope
 
 - `terraform/modules/zoa/` — DynamoDB tables, S3 bucket, KMS key, ECR
 - `terraform/modules/zoa-lambda/` — Per-VPC Lambda functions, IAM, EventBridge, EKS access
+- [ZOA Architecture ADR](https://github.com/openshift-online/rosa-hyperfleet/blob/main/docs/design/zoa-architecture.md) — infrastructure architecture, Terraform context, and platform integration

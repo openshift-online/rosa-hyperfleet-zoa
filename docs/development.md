@@ -29,6 +29,13 @@ make all                    # fmt → vet → lint → test → build
 | `make test` | Unit tests with coverage and race detection |
 | `make verify` | Read-only checks (`fmt-check + vet + lint`) |
 | `make tidy` | Clean up `go.mod` / `go.sum` |
+| `make test-e2e` | E2E deep suite (requires `ZOA_RC_API_URL` / `ZOA_MC_API_URL`) |
+| `make test-e2e-smoke` | E2E smoke subset only (~2min) |
+| `make image-lambda` | Build Lambda container image |
+| `make image-runner` | Build runner container image |
+| `make image-push-lambda` | Build + push Lambda image (`:latest` + `:commit`) |
+| `make image-push-runner` | Build + push runner image (`:latest` + `:commit`) |
+| `make images-push` | Build + push both images (single command for dev workflow) |
 
 ## Binaries
 
@@ -56,15 +63,50 @@ go test ./pkg/executor/...   # Executor tests only
 - Test names follow `"When ... it should ..."` format
 - All tests run with `-race` flag
 
+### End-to-End Tests
+
+`test/e2e/` is a Ginkgo suite (build-tagged `e2e`, excluded from `make test`) that drives the
+built `zoa` CLI against a real, already-provisioned RC and/or MC ZOA Lambda API and exercises
+every registered Trusted Action.
+
+```bash
+# Set URLs (from `make ephemeral-list ID=...` in rosa-hyperfleet)
+export ZOA_RC_API_URL="https://<id>.lambda-url.<region>.on.aws/"
+export ZOA_MC_API_URL="https://<id>.lambda-url.<region>.on.aws/"
+
+# Override AWS profiles — your host uses rrp-regional-dev / rrp-management-dev,
+# but the suite defaults to rrp-rc / rrp-mc (used inside CI containers).
+export ZOA_RC_AWS_PROFILE="rrp-regional-dev"
+export ZOA_MC_AWS_PROFILE="rrp-management-dev"
+
+make test-e2e                          # full deep suite
+make test-e2e-smoke                    # Label("smoke") subset (~2min)
+GINKGO_FLAGS=-ginkgo.v make test-e2e   # verbose output
+```
+
+RC and MC run in parallel automatically when both URLs are set. If only one URL is set, only
+that target runs.
+
+**If you changed API/TA code** (not just tests), you must build and deploy your images to the
+ephemeral before running e2e — see the
+[Developer Workflow](e2e-testing.md#developer-workflow-testing-code-changes) section in
+`e2e-testing.md` for the full step-by-step (`make images-push` → configure tag → resync → test).
+
+See **[`docs/e2e-testing.md`](e2e-testing.md)** for the full guide: running against a dev-account
+ephemeral environment (from this repo or from `rosa-hyperfleet`), CI image injection, AWS
+credentials.
+
 ## CI
 
-CI runs via [OpenShift CI (Prow)](https://prow.ci.openshift.org/):
+CI runs via [OpenShift CI (Prow)](https://prow.ci.openshift.org/).
+Config: [`openshift/release` — `ci-operator/config/openshift-online/rosa-hyperfleet-zoa/`](https://github.com/openshift/release/blob/master/ci-operator/config/openshift-online/rosa-hyperfleet-zoa/openshift-online-rosa-hyperfleet-zoa-main.yaml).
 
-| Job | Script | What it checks |
-|-----|--------|----------------|
-| `lint` | `ci/lint.sh` | `make fmt-check` + `make lint` |
-| `test` | `ci/unit-tests.sh` | `make test` + coverage artifacts |
-| `verify` | `ci/verify.sh` | `make verify` |
+| Job | What it checks |
+|-----|----------------|
+| `lint` | `make fmt-check` + `make lint` |
+| `test` | `make test` + coverage artifacts |
+| `verify` | `make verify` |
+| `on-demand-e2e` | Full e2e against an ephemeral env with this PR's images (`/test on-demand-e2e`) |
 
 ## Commit Conventions
 
@@ -93,8 +135,7 @@ workflow then:
 Install instructions for end users are in the
 [CLI Reference](cli-reference.md#install).
 
-Lambda and runner images are separate (`make image` / `make image-push`); they
-are not GitHub Release assets.
+Lambda and runner images are separate; they are not GitHub Release assets.
 
 ## Container Images
 
@@ -104,8 +145,11 @@ are not GitHub Release assets.
 | `zoa-runner` | `Containerfile.runner` | Async runner (UBI9 + `zoa-runner` + `zoa` CLI, runs inside K8s Jobs) |
 
 ```bash
-make image          # Build Lambda image
-make image-push     # Build and push
+make image-lambda        # Build Lambda image only
+make image-runner        # Build runner image only
+make image-push-lambda   # Build + push Lambda (:latest + :commit)
+make image-push-runner   # Build + push runner (:latest + :commit)
+make images-push         # Build + push both images (dev workflow)
 ```
 
 ## GVM Users
