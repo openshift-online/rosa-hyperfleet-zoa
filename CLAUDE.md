@@ -50,10 +50,11 @@ make test             # Unit tests (go test -race -coverprofile)
 make lint             # golangci-lint
 make verify           # fmt-check + vet + lint (CI-safe, read-only)
 make fmt              # Format code
-make image            # Build zoa-lambda container image
-make image-runner     # Build zoa-runner container image
-make image-push       # Build + push zoa-lambda (latest + git commit tag)
-make image-push-runner # Build + push zoa-runner (latest + git commit tag)
+make image-lambda        # Build zoa-lambda container image
+make image-runner        # Build zoa-runner container image
+make image-push-lambda   # Build + push zoa-lambda (latest + git commit tag)
+make image-push-runner   # Build + push zoa-runner (latest + git commit tag)
+make images-push         # Build + push both images (dev workflow)
 ```
 
 ## Important Context

@@ -84,14 +84,20 @@ type DispatchRequest struct {
 }
 
 type DispatchResponse struct {
-	ID             string     `json:"id"`
-	Status         string     `json:"status"`
-	TargetCluster  string     `json:"target_cluster"`
-	ExecutedAction string     `json:"executed_action,omitempty"`
-	ExecutionMode  string     `json:"execution_mode,omitempty"`
-	Output         FlexString `json:"output,omitempty"`
-	Logs           string     `json:"logs,omitempty"`
-	DurationMs     *int64     `json:"duration_ms,omitempty"`
+	ID              string     `json:"id"`
+	Action          string     `json:"action"`
+	RequestedAction string     `json:"requested_action,omitempty"`
+	TargetCluster   string     `json:"target_cluster"`
+	Operator        string     `json:"operator"`
+	Status          string     `json:"status"`
+	ExecutionMode   string     `json:"execution_mode,omitempty"`
+	Scope           string     `json:"scope"`
+	Type            string     `json:"type"`
+	DryRun          bool       `json:"dry_run"`
+	Force           bool       `json:"force"`
+	Output          FlexString `json:"output,omitempty"`
+	Logs            string     `json:"logs,omitempty"`
+	DurationMs      *int64     `json:"duration_ms,omitempty"`
 }
 
 type ActionParam struct {

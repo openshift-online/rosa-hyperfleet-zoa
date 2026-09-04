@@ -1,10 +1,80 @@
 package api
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/openshift-online/rosa-hyperfleet-zoa/pkg/actions"
 )
+
+// TestCreateResponse_WhenSerialized_ItShouldIncludeAllCLIExpectedFields verifies
+// that the dispatch response JSON includes all fields the CLI expects.
+// This test would have caught the bug where action/scope/type were missing.
+func TestCreateResponse_WhenSerialized_ItShouldIncludeAllCLIExpectedFields(t *testing.T) {
+	durationMs := int64(123)
+	resp := createResponse{
+		ID:              "test-id",
+		Action:          "get_resource",
+		RequestedAction: "rollout_restart",
+		TargetCluster:   "test-cluster",
+		Operator:        "test-operator",
+		Status:          "succeeded",
+		ExecutionMode:   "sync",
+		Scope:           "kube-api",
+		Type:            "read",
+		DryRun:          true,
+		Force:           true,
+		DurationMs:      &durationMs,
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatalf("failed to marshal response: %v", err)
+	}
+
+	// Unmarshal into a generic map to verify field names
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	// These are the fields the CLI expects (from internal/client/types.go Execution struct)
+	requiredFields := []string{
+		"id",
+		"action", // NOT "executed_action" - CLI expects "action"
+		"target_cluster",
+		"operator",
+		"status",
+		"execution_mode",
+		"scope",
+		"type",
+		"dry_run",
+		"force",
+	}
+
+	for _, field := range requiredFields {
+		if _, ok := result[field]; !ok {
+			t.Errorf("response JSON missing required field %q (CLI will see empty value)", field)
+		}
+	}
+
+	// Verify specific values
+	if result["action"] != "get_resource" {
+		t.Errorf("expected action=%q, got %v", "get_resource", result["action"])
+	}
+	if result["operator"] != "test-operator" {
+		t.Errorf("expected operator=%q, got %v", "test-operator", result["operator"])
+	}
+	if result["requested_action"] != "rollout_restart" {
+		t.Errorf("expected requested_action=%q, got %v", "rollout_restart", result["requested_action"])
+	}
+	if result["scope"] != "kube-api" {
+		t.Errorf("expected scope=%q, got %v", "kube-api", result["scope"])
+	}
+	if result["type"] != "read" {
+		t.Errorf("expected type=%q, got %v", "read", result["type"])
+	}
+}
 
 func TestValidateParams_WhenAllRequiredPresent_ItShouldSucceed(t *testing.T) {
 	meta := actions.ActionMetadata{

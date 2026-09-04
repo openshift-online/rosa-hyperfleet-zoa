@@ -28,14 +28,20 @@ type createRequest struct {
 }
 
 type createResponse struct {
-	ID             string          `json:"id"`
-	Status         string          `json:"status"`
-	TargetCluster  string          `json:"target_cluster"`
-	ExecutedAction string          `json:"executed_action,omitempty"`
-	ExecutionMode  string          `json:"execution_mode"`
-	Output         json.RawMessage `json:"output,omitempty"`
-	Logs           string          `json:"logs,omitempty"`
-	DurationMs     *int64          `json:"duration_ms,omitempty"`
+	ID              string          `json:"id"`
+	Action          string          `json:"action"`
+	RequestedAction string          `json:"requested_action,omitempty"`
+	TargetCluster   string          `json:"target_cluster"`
+	Operator        string          `json:"operator"`
+	Status          string          `json:"status"`
+	ExecutionMode   string          `json:"execution_mode"`
+	Scope           string          `json:"scope"`
+	Type            string          `json:"type"`
+	DryRun          bool            `json:"dry_run"`
+	Force           bool            `json:"force"`
+	DurationMs      *int64          `json:"duration_ms,omitempty"`
+	Output          json.RawMessage `json:"output,omitempty"`
+	Logs            string          `json:"logs,omitempty"`
 }
 
 func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request, actionName string) {
@@ -103,7 +109,10 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request, actionNam
 	}
 
 	// Write cooldown check (prevents duplicate SRE requests at UX level)
-	if meta.Type == "write" && !req.Force {
+	// Cooldown is per (target, action, params) — different params means different target workload.
+	// - Dry-run executions don't trigger or count towards cooldown (no real mutation)
+	// - Force bypasses cooldown but doesn't affect what triggers cooldown
+	if meta.Type == "write" && !req.Force && !req.DryRun {
 		cooldown := h.cfg.WriteCooldownSeconds
 		if meta.WriteCooldownSeconds > 0 {
 			cooldown = meta.WriteCooldownSeconds
@@ -115,10 +124,13 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request, actionNam
 			writeError(w, http.StatusInternalServerError, "internal_error", "failed to check write cooldown")
 			return
 		}
-		if len(recent) > 0 {
+		// Filter to executions with matching params (same target workload)
+		// Exclude dry-runs (they don't count as real executions)
+		matching := filterMatchingParams(recent, req.Params)
+		if len(matching) > 0 {
 			h.recordAudit(r, http.StatusTooManyRequests, actionName, "", withJira(req.Jira), withForce(req.Force), withDryRun(req.DryRun))
 			writeError(w, http.StatusTooManyRequests, "write_cooldown",
-				fmt.Sprintf("action %q was executed within the last %ds; use force=true to override", actionName, cooldown))
+				fmt.Sprintf("action %q with these params was executed within the last %ds; use force=true to override", actionName, cooldown))
 			return
 		}
 	}
@@ -223,21 +235,33 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request, actionNam
 				"durationMs":  int64(0),
 			})
 		writeJSON(w, http.StatusOK, createResponse{
-			ID:             executionID,
-			TargetCluster:  h.cfg.TargetCluster,
-			Status:         string(store.StatusFailed),
-			ExecutedAction: executedAction,
-			ExecutionMode:  execMode,
+			ID:              executionID,
+			Action:          executedAction,
+			RequestedAction: requestedAction,
+			TargetCluster:   h.cfg.TargetCluster,
+			Operator:        operator,
+			Status:          string(store.StatusFailed),
+			ExecutionMode:   execMode,
+			Scope:           meta.Scope,
+			Type:            meta.Type,
+			DryRun:          req.DryRun,
+			Force:           req.Force,
 		})
 		return
 	}
 
 	writeJSON(w, http.StatusAccepted, createResponse{
-		ID:             executionID,
-		TargetCluster:  h.cfg.TargetCluster,
-		Status:         string(store.StatusDispatched),
-		ExecutedAction: executedAction,
-		ExecutionMode:  execMode,
+		ID:              executionID,
+		Action:          executedAction,
+		RequestedAction: requestedAction,
+		TargetCluster:   h.cfg.TargetCluster,
+		Operator:        operator,
+		Status:          string(store.StatusDispatched),
+		ExecutionMode:   execMode,
+		Scope:           meta.Scope,
+		Type:            meta.Type,
+		DryRun:          req.DryRun,
+		Force:           req.Force,
 	})
 }
 
@@ -280,12 +304,18 @@ func (h *Handler) executeSyncAndRespond(w http.ResponseWriter, ctx context.Conte
 	}
 
 	resp := createResponse{
-		ID:             exec.ID,
-		TargetCluster:  h.cfg.TargetCluster,
-		Status:         string(finalStatus),
-		ExecutedAction: exec.Action,
-		ExecutionMode:  exec.ExecutionMode,
-		DurationMs:     &durationMs,
+		ID:              exec.ID,
+		Action:          exec.Action,
+		RequestedAction: exec.RequestedAction,
+		TargetCluster:   h.cfg.TargetCluster,
+		Operator:        exec.Operator,
+		Status:          string(finalStatus),
+		ExecutionMode:   exec.ExecutionMode,
+		Scope:           exec.Scope,
+		Type:            exec.Type,
+		DryRun:          exec.DryRun,
+		Force:           exec.Force,
+		DurationMs:      &durationMs,
 	}
 	if result != nil {
 		if finalStatus == store.StatusSucceeded {
@@ -316,4 +346,35 @@ func validateParams(meta actions.ActionMetadata, params map[string]string) error
 	}
 
 	return nil
+}
+
+// filterMatchingParams filters executions to those with matching params.
+// - Excludes dry-run executions (they don't count towards cooldown)
+// - Matches all params exactly (cooldown is per target workload, not just action)
+func filterMatchingParams(executions []*store.Execution, params map[string]string) []*store.Execution {
+	var matching []*store.Execution
+	for _, e := range executions {
+		// Dry-runs don't count towards cooldown (no real mutation happened)
+		if e.DryRun {
+			continue
+		}
+		// Check if params match (same target workload)
+		if paramsMatch(e.Params, params) {
+			matching = append(matching, e)
+		}
+	}
+	return matching
+}
+
+// paramsMatch returns true if the two param maps have the same keys and values.
+func paramsMatch(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
 }

@@ -1,5 +1,7 @@
-.PHONY: all build dist print-version clean install test fmt fmt-check vet lint verify tidy verify-mod \
-       image image-runner image-push image-push-runner help
+.PHONY: all build dist print-version clean install test test-e2e test-e2e-smoke \
+       fmt fmt-check vet lint verify tidy verify-mod \
+       image-lambda image-runner image-push-lambda image-push-runner images-push \
+       help
 
 BINARY_NAME = zoa
 BUILD_DIR   = ./bin
@@ -10,8 +12,8 @@ CLI_PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 HASH_CMD      := $(shell command -v sha256sum >/dev/null 2>&1 && echo sha256sum || echo "shasum -a 256")
 
 # Container images
-IMAGE_REPO        ?= quay.io/slopezz/zoa-lambda
-RUNNER_IMAGE_REPO ?= quay.io/slopezz/zoa-runner
+IMAGE_REPO        ?= quay.io/rrp-dev-ci/zoa-lambda
+RUNNER_IMAGE_REPO ?= quay.io/rrp-dev-ci/zoa-runner
 IMAGE_TAG         ?= latest
 GIT_COMMIT        = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
@@ -86,6 +88,50 @@ verify-mod: tidy
 test:
 	@go test -race -coverprofile=coverage.out ./...
 
+# test-e2e drives the built zoa CLI against an already-provisioned RC and/or
+# MC environment (ZOA_RC_API_URL / ZOA_MC_API_URL). It is excluded from
+# `test` via the `e2e` build tag so `make test` / CI unit tests never need
+# live infrastructure. See test/e2e/suite_test.go.
+#
+# When both RC and MC targets are set, each runs as its own process in
+# parallel — sequential within a target, parallel across targets (~2x speedup).
+# Falls back to single-process when only one target is configured.
+#
+# Pass GINKGO_FLAGS for verbose output: GINKGO_FLAGS=-ginkgo.v make test-e2e
+GINKGO_FLAGS ?=
+ZOA_BIN_ABS   = $(abspath $(BUILD_DIR))/$(BINARY_NAME)
+E2E_COMMON    = ZOA_BIN=$(ZOA_BIN_ABS) go test -tags e2e ./test/e2e/... -v $(GINKGO_FLAGS)
+
+define run_e2e_parallel
+	@rc_exit=0; mc_exit=0; \
+	if [ -n "$(ZOA_RC_API_URL)" ] && [ -n "$(ZOA_MC_API_URL)" ]; then \
+		set -o pipefail; \
+		echo "Running RC and MC in parallel..."; \
+		(ZOA_MC_API_URL= $(E2E_COMMON) $(1) 2>&1 | sed 's/^/[RC] /') & rc_pid=$$!; \
+		(ZOA_RC_API_URL= $(E2E_COMMON) $(1) 2>&1 | sed 's/^/[MC] /') & mc_pid=$$!; \
+		wait $$rc_pid || rc_exit=$$?; \
+		wait $$mc_pid || mc_exit=$$?; \
+		if [ $$rc_exit -ne 0 ] || [ $$mc_exit -ne 0 ]; then \
+			echo "FAIL: RC=$$rc_exit MC=$$mc_exit"; exit 1; \
+		fi; \
+		echo "PASS: both RC and MC succeeded"; \
+	else \
+		$(E2E_COMMON) $(1); \
+	fi
+endef
+
+test-e2e: build
+	$(call run_e2e_parallel,-timeout 20m)
+
+# test-e2e-smoke runs only the specs labeled "smoke" — cheap, --dry-run/read-only
+# coverage (discovery + one read TA + one write TA dry-run) meant to be run
+# from rosa-hyperfleet/rosa-hyperfleet-api's own e2e jobs so infra/platform
+# changes can't silently break ZOA without adding meaningful time to those
+# runs. Full validation (including real delete_pod/rollout_restart execution)
+# is `make test-e2e`, exercised only from this repo's own on-demand-e2e/nightly.
+test-e2e-smoke: build
+	$(call run_e2e_parallel,-timeout 5m -ginkgo.label-filter=smoke)
+
 # =============================================================================
 # Code Quality
 # =============================================================================
@@ -108,21 +154,19 @@ verify: fmt-check vet lint
 # Container Images
 # =============================================================================
 
-image:
+image-lambda:
 	$(CONTAINER_RUNTIME) build \
 		--platform linux/amd64 \
-		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
 		-t $(IMAGE_REPO):$(IMAGE_TAG) \
 		-f Containerfile .
 
 image-runner:
 	$(CONTAINER_RUNTIME) build \
 		--platform linux/amd64 \
-		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
 		-t $(RUNNER_IMAGE_REPO):$(IMAGE_TAG) \
 		-f Containerfile.runner .
 
-image-push: image
+image-push-lambda: image-lambda
 	$(CONTAINER_RUNTIME) push $(IMAGE_REPO):$(IMAGE_TAG)
 	$(CONTAINER_RUNTIME) tag $(IMAGE_REPO):$(IMAGE_TAG) $(IMAGE_REPO):$(GIT_COMMIT)
 	$(CONTAINER_RUNTIME) push $(IMAGE_REPO):$(GIT_COMMIT)
@@ -131,6 +175,11 @@ image-push-runner: image-runner
 	$(CONTAINER_RUNTIME) push $(RUNNER_IMAGE_REPO):$(IMAGE_TAG)
 	$(CONTAINER_RUNTIME) tag $(RUNNER_IMAGE_REPO):$(IMAGE_TAG) $(RUNNER_IMAGE_REPO):$(GIT_COMMIT)
 	$(CONTAINER_RUNTIME) push $(RUNNER_IMAGE_REPO):$(GIT_COMMIT)
+
+# Meta target — build + push both images in one command (dev workflow).
+# Each image-push-* target depends on the corresponding image-* build target,
+# so this single command builds and pushes everything.
+images-push: image-push-lambda image-push-runner
 
 # =============================================================================
 # Help
@@ -146,11 +195,15 @@ help:
 	@echo ""
 	@echo "Test & Quality:"
 	@echo "  test               Run unit tests with race detection"
+	@echo "  test-e2e           Run full deep e2e suite (auto-parallel when both RC+MC are set)"
+	@echo "  test-e2e-smoke     Run only Label(\"smoke\") e2e specs (used by rosa-hyperfleet/-api)"
+	@echo "                     Verbose: GINKGO_FLAGS=-ginkgo.v make test-e2e"
 	@echo "  verify             fmt-check + vet + lint"
 	@echo "  fmt                Format code"
 	@echo ""
 	@echo "Images:"
-	@echo "  image              Build zoa-lambda image (primary)"
-	@echo "  image-runner       Build zoa-runner image (async Jobs + CLI)"
-	@echo "  image-push         Build + push zoa-lambda"
-	@echo "  image-push-runner  Build + push zoa-runner"
+	@echo "  image-lambda       Build zoa-lambda image"
+	@echo "  image-runner       Build zoa-runner image"
+	@echo "  image-push-lambda  Build + push zoa-lambda (:latest + :commit)"
+	@echo "  image-push-runner  Build + push zoa-runner (:latest + :commit)"
+	@echo "  images-push        Build + push both images (single command for dev workflow)"

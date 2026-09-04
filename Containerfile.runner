@@ -1,9 +1,6 @@
 FROM registry.access.redhat.com/ubi9/go-toolset:1.26.7-1788409979 AS builder
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
-ARG ZOA_VERSION=0.2.0
-ARG GIT_COMMIT=unknown
-
 USER 0
 RUN mkdir -p /workspace && chown 1001:0 /workspace
 USER 1001
@@ -15,7 +12,10 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 
-RUN BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) && \
+RUN git config --global --add safe.directory /workspace && \
+    ZOA_VERSION=$(grep '^VERSION ' Makefile | awk '{print $3}') && \
+    GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") && \
+    BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) && \
     VERSION_PKG="github.com/openshift-online/rosa-hyperfleet-zoa/internal/version" && \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
     -buildvcs=false \
