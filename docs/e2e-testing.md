@@ -73,36 +73,129 @@ your code changes.
 > happens in CI via the `on-demand-e2e` Prow job. For local development, you manage the image
 > lifecycle manually.
 
-### Step-by-step
+### Image Naming Reference
+
+| Source | Image Tag Format | Registry |
+|--------|------------------|----------|
+| **PR builds** (Tekton) | `on-pr-<commit-sha>` | `quay.io/redhat-user-workloads/rosa-tenant/zoa-lambda` |
+| **Main branch** (Tekton) | `<commit-sha>` | `quay.io/redhat-user-workloads/rosa-tenant/zoa-lambda` |
+| **Dev builds** (local) | `latest` or `<commit-sha>` | `quay.io/rrp-dev-ci/zoa-lambda` |
+| **Manual** | Any tag you choose | Your quay.io namespace |
+
+PR images expire after 5 days. Main-branch and dev images persist indefinitely.
+
+### Step-by-step (Using PR Images)
+
+The recommended approach is to push your changes to a branch and let Tekton build the images automatically:
 
 ```bash
-# 1. Build + push both images to Quay (single command)
+# 1. Push your code to trigger PR image build
 cd rosa-hyperfleet-zoa
-make images-push
-# → pushes quay.io/rrp-dev-ci/zoa-lambda:<commit> and zoa-runner:<commit>
+git push origin HEAD:feat/my-feature   # or push to main
 
-# 2. Note the commit tag (printed during push, or run:)
-git rev-parse --short HEAD   # e.g. fc40612
+# 2. Open a PR on GitHub in normal mode (NOT draft) with hold label
+# Use --label to prevent accidental merges during testing
+gh pr create \
+  --title "feat: your feature description" \
+  --body "Description of changes..." \
+  --label "do-not-merge/hold" \
+  --base main
 
-# 3. Configure the new image tag in rosa-hyperfleet
+# 3. Trigger the Konflux build (required when pushing from a fork)
+# Add this comment to the PR to start the build
+gh pr comment <pr-number> --body "/ok-to-test"
+
+# 4. Wait for the build check to pass in the PR
+# Tekton will build: quay.io/redhat-user-workloads/rosa-tenant/zoa-lambda:on-pr-<commit>
+
+# 5. Get your commit SHA
+git rev-parse --short HEAD   # e.g. 1fa64b3
+
+# 6. Configure ephemeral override in rosa-hyperfleet
 cd ../rosa-hyperfleet
-# Edit config/defaults.yaml:
-#   zoa_lambda_image_tag: "fc40612"
-#   zoa_runner_image_tag: "fc40612"
-uv run scripts/render.py     # regenerate deploy/ files
+mkdir -p .ephemeral-env
 
-# 4. Resync the ephemeral to deploy the new Lambda
+# Create override config pointing to your PR images
+# Note: If testing sync actions only, you can omit zoa_runner_* overrides
+# The runner image is only needed for async actions
+cat > .ephemeral-env/defaults.yaml <<EOF
+regional_cluster:
+  zoa_lambda_image_tag: "on-pr-1fa64b3"
+  zoa_runner_image_tag: "on-pr-1fa64b3"
+  zoa_lambda_source_image: "quay.io/redhat-user-workloads/rosa-tenant/zoa-lambda"
+  zoa_runner_source_image: "quay.io/redhat-user-workloads/rosa-tenant/zoa-runner"
+EOF
+
+# Alternative: Override only Lambda image (if runner build is still pending)
+# cat > .ephemeral-env/defaults.yaml <<EOF
+# regional_cluster:
+#   zoa_lambda_image_tag: "on-pr-1fa64b3"
+#   zoa_lambda_source_image: "quay.io/redhat-user-workloads/rosa-tenant/zoa-lambda"
+# EOF
+
+# Create region file (required for .ephemeral-env/)
+cat > .ephemeral-env/us-east-1.yaml <<EOF
+provision_mcs:
+  mc01: {}
+EOF
+
+# 7. Resync the ephemeral to deploy the new Lambda
 make ephemeral-resync ID=<your-env-id>
 
-# 5. Run e2e tests (picks up your code changes via the new Lambda)
+# 8. Run e2e tests (picks up your code changes via the new Lambda)
 make ephemeral-zoa-e2e ID=<your-env-id> \
-  ZOA_REF=my-feature-branch \
-  ZOA_REPO=https://github.com/my-fork/rosa-hyperfleet-zoa.git
+  ZOA_REF=feat/my-feature \
+  ZOA_REPO=https://github.com/openshift-online/rosa-hyperfleet-zoa.git
+```
+
+### Alternative: Manual Image Build and Push
+
+If you need to test uncommitted changes or don't have PR access, you can build and push manually:
+
+```bash
+# 1. Build + push both images to Quay (requires quay.io login and write access)
+cd rosa-hyperfleet-zoa
+podman login quay.io
+make images-push IMAGE_REPO=quay.io/your-username/zoa-lambda \
+                RUNNER_IMAGE_REPO=quay.io/your-username/zoa-runner \
+                IMAGE_TAG=test-my-feature
+
+# 2. Configure ephemeral override to use your images
+cd ../rosa-hyperfleet
+mkdir -p .ephemeral-env
+
+cat > .ephemeral-env/defaults.yaml <<EOF
+regional_cluster:
+  zoa_lambda_image_tag: "test-my-feature"
+  zoa_runner_image_tag: "test-my-feature"
+  zoa_lambda_source_image: "quay.io/your-username/zoa-lambda"
+  zoa_runner_source_image: "quay.io/your-username/zoa-runner"
+EOF
+
+cat > .ephemeral-env/us-east-1.yaml <<EOF
+provision_mcs:
+  mc01: {}
+EOF
+
+# 3. Resync and test
+make ephemeral-resync ID=<your-env-id>
+make ephemeral-zoa-e2e ID=<your-env-id>
 ```
 
 If you are only changing **test code** (files in `test/e2e/` or `test/e2e-monitoring/`) and
-not API/TA code, skip steps 1–4 — the existing Lambda is fine, you just need the tests to use
-your branch (via `ZOA_REF`).
+not API/TA code, skip the image build steps entirely — the existing Lambda is fine, you just
+need the tests to use your branch (via `ZOA_REF`).
+
+**Notes:**
+- The `.ephemeral-env/` directory is gitignored and only affects your local machine
+- PR images expire after 5 days (sufficient for testing)
+- **Do not create draft PRs** - Konflux builds may not trigger for drafts; use `do-not-merge/hold` label instead
+- When pushing from a fork, you must add `/ok-to-test` comment to trigger builds
+- **Lambda vs Runner builds**: If testing sync actions, you only need the Lambda image (runner builds can be skipped or left at default). Runner is only needed for async actions.
+- Konflux builds Lambda and Runner in parallel, but Lambda usually finishes first - you can start testing sync actions immediately
+- If you need to iterate quickly on uncommitted changes, use the manual build approach
+- Remember to remove or update `.ephemeral-env/defaults.yaml` after testing to avoid using stale images
+- Remove the `do-not-merge/hold` label when ready to merge
 
 ### When is image management automatic?
 
