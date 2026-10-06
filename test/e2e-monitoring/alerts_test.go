@@ -26,7 +26,7 @@ var zoaAlertingRules = []string{
 	"ZOACircuitBreakerFlapping",
 }
 
-var _ = Describe("ZOA Alerting Rules", func() {
+var _ = Describe("ZOA Alerting Rules", Label("smoke"), func() {
 	for _, alert := range zoaAlertingRules {
 		alert := alert // capture
 		It("should have "+alert+" loaded in Thanos Ruler", func() {

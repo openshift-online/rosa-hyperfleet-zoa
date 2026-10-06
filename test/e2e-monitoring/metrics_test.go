@@ -25,7 +25,7 @@ var _ = Describe("ZOA Metrics", func() {
 	// alerts_test.go — those verify the rule definition is loaded in
 	// Thanos Ruler, which succeeds regardless of whether the underlying
 	// metric has data yet.
-	Context("infrastructure metrics", func() {
+	Context("infrastructure metrics", Label("smoke"), func() {
 
 		It("should have Lambda invocation metrics for ZOA functions", func() {
 			query := `count(aws_lambda_invocations_sum{dimension_FunctionName=~".*-zoa-(api|worker)"}) > 0`
@@ -79,7 +79,7 @@ var _ = Describe("ZOA Metrics", func() {
 
 	// Execution metrics require TA runs to produce data. Smoke ZOA E2E
 	// executes both sync and async TAs against RC and MC targets.
-	Context("execution metrics", func() {
+	Context("execution metrics", Label("smoke"), func() {
 
 		It("should have execution count metrics", func() {
 			query := `count(aws_zoa_execution_count_sum) > 0`
@@ -114,7 +114,7 @@ var _ = Describe("ZOA Metrics", func() {
 	// If the proxy breaks, MC alerts go blind silently.
 	//
 	// RC/MC via cluster_type on externalLabels (not cluster name patterns).
-	Context("cluster labels", func() {
+	Context("cluster labels", Label("smoke"), func() {
 
 		It("should have EMF metrics from the regional cluster", func() {
 			query := `count(aws_zoa_reconciler_last_run_maximum{cluster_type="regional-cluster"}) > 0`
@@ -180,10 +180,22 @@ var _ = Describe("ZOA Metrics", func() {
 			GinkgoWriter.Printf("management clusters: %v\n", managementClusters)
 		})
 
+		// Smoke-safe: reconciler ticks and Lambda invocations are emitted
+		// passively by every running RC/MC ZOA deployment, independent of any
+		// functional traffic.
 		ruleNames := []string{
 			"zoa:reconciler_last_run",
 			"zoa:reconciler_tick_count",
 			"zoa:lambda_error_rate",
+		}
+
+		// Traffic-dependent: these only produce a series once a TA executes
+		// (execution_count_sum) or the API is called (http_request_count_sum)
+		// against the cluster. Smoke doesn't drive traffic to every cluster —
+		// notably the MC, whose functional endpoint (ZOA_MC_API_URL) is often
+		// unset in presubmit ephemeral envs, leaving only passive metrics — so
+		// these run only in the full suite, where real traffic is driven.
+		trafficRuleNames := []string{
 			"zoa:ta_success_rate",
 			"zoa:ta_total_executions",
 			"zoa:api_availability",
@@ -203,6 +215,16 @@ var _ = Describe("ZOA Metrics", func() {
 		}
 
 		for _, rule := range ruleNames {
+			rule := rule
+			It("should have "+rule+" on every regional cluster", Label("smoke"), func() {
+				assertRuleOnAllClusters(rule, regionalClusters, "regional")
+			})
+			It("should have "+rule+" on every management cluster", Label("smoke"), func() {
+				assertRuleOnAllClusters(rule, managementClusters, "management")
+			})
+		}
+
+		for _, rule := range trafficRuleNames {
 			rule := rule
 			It("should have "+rule+" on every regional cluster", func() {
 				assertRuleOnAllClusters(rule, regionalClusters, "regional")

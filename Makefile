@@ -122,6 +122,7 @@ define run_e2e_monitoring
 		--timeout=$(E2E_MONITORING_TIMEOUT) \
 		--junit-report=$(E2E_MONITORING_JUNIT) \
 		--output-dir=$(TEST_OUTPUT_DIR) \
+		$(1) \
 		./test/e2e-monitoring
 endef
 
@@ -154,10 +155,11 @@ test-e2e: build $(GINKGO)
 # changes can't silently break ZOA without adding meaningful time to those
 # runs. Full validation (including real delete_pod/rollout_restart execution)
 # is `make test-e2e`, exercised only from this repo's own on-demand-e2e/nightly.
+# The monitoring suite likewise runs only its "smoke"-labeled specs here.
 test-e2e-smoke: build $(GINKGO)
 	$(call run_e2e_parallel,--timeout=5m --label-filter=smoke)
-	@echo ""; echo "=== ZOA Monitoring E2E ==="
-	$(call run_e2e_monitoring)
+	@echo ""; echo "=== ZOA Monitoring E2E (smoke) ==="
+	$(call run_e2e_monitoring,--label-filter=smoke)
 
 # test-e2e-zoa runs only the ZOA functional e2e suite (no monitoring).
 test-e2e-zoa: build $(GINKGO)

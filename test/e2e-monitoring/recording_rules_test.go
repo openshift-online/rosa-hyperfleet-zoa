@@ -19,7 +19,7 @@ var zoaRecordingRules = []string{
 	"zoa:gc_tick_count",
 }
 
-var _ = Describe("ZOA Recording Rules", func() {
+var _ = Describe("ZOA Recording Rules", Label("smoke"), func() {
 	for _, rule := range zoaRecordingRules {
 		rule := rule // capture
 		It("should have "+rule+" loaded in Thanos Ruler", func() {
