@@ -166,6 +166,38 @@ func TestAllRegisteredActions_Conformance(t *testing.T) {
 	}
 }
 
+// TestAllRegisteredActions_HaveE2ETestFile ensures every catalog TA is referenced
+// from a test/e2e/ta_*_test.go file (PR gate, no live Lambda required).
+func TestAllRegisteredActions_HaveE2ETestFile(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	e2eDir := filepath.Join(filepath.Dir(thisFile), "..", "..", "test", "e2e")
+	taFiles, err := filepath.Glob(filepath.Join(e2eDir, "ta_*_test.go"))
+	if err != nil {
+		t.Fatalf("glob error: %v", err)
+	}
+	if len(taFiles) == 0 {
+		t.Fatalf("no test/e2e/ta_*_test.go files under %s", e2eDir)
+	}
+
+	var combined string
+	for _, f := range taFiles {
+		data, readErr := os.ReadFile(f)
+		if readErr != nil {
+			t.Fatalf("read %s: %v", f, readErr)
+		}
+		combined += string(data) + "\n"
+	}
+
+	for _, action := range ListCatalog() {
+		meta := action.Metadata()
+		t.Run(meta.Name, func(t *testing.T) {
+			if !strings.Contains(combined, meta.Name) {
+				t.Errorf("TA %q has no test/e2e/ta_*_test.go coverage — add or extend a ta_* e2e file", meta.Name)
+			}
+		})
+	}
+}
+
 // TestAllRegisteredActions_HaveTestFile ensures every TA implementation file
 // has a corresponding test file. This prevents shipping untested TAs.
 func TestAllRegisteredActions_HaveTestFile(t *testing.T) {

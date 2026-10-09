@@ -16,7 +16,7 @@ var _ = Describe("zoa actions", func() {
 		tgt := tgt
 
 		Describe(tgt.Name, func() {
-			It("lists all registered Trusted Actions", Label("smoke"), func() {
+			It("lists live Trusted Actions that are declared in the catalog", Label("smoke"), func() {
 				out, err := runZoa(tgt, "actions", "-o", "json")
 				Expect(err).NotTo(HaveOccurred(), out)
 
@@ -32,10 +32,7 @@ var _ = Describe("zoa actions", func() {
 				for _, a := range list.Items {
 					names = append(names, a.Name)
 				}
-				want := expectedActionsForDeployment(tgt.DeploymentTarget)
-				Expect(names).To(Equal(want),
-					"`zoa actions` on %s should list exactly the TAs with DeploymentTargets including %q",
-					tgt.Name, tgt.DeploymentTarget)
+				expectLiveActionsInCatalog(tgt, names)
 			})
 
 			It("lists actions in table format by default", func() {

@@ -240,11 +240,12 @@ Two conformance gates ensure every Trusted Action stays tested:
 
 - **Unit conformance** (`pkg/actions/conformance_test.go`, runs on every PR via `make test`):
   required metadata, naming conventions, scope-RBAC consistency, write-TA safety rules, timeout
-  ceiling compliance, parameter uniqueness, and unit test file existence.
+  ceiling compliance, parameter uniqueness, unit test file existence, and `test/e2e/ta_*` coverage.
 - **E2E conformance** (`test/e2e/conformance_test.go`, runs on every `make test-e2e`):
-  queries the live Lambda registry, verifies every registered TA has a `ta_*` e2e test file,
-  checks `knownActions` matches the live registry, and ensures smoke tests cover both `kube-api`
-  and `aws-api` scopes.
+  queries the live Lambda registry and verifies every **live** TA has a `ta_*` e2e test file.
+  Smoke `zoa actions` checks live ⊆ `pkg/actions` catalog (promoted images may lag `main`).
+  Per-TA e2e specs skip when an action is not yet on the endpoint. Also ensures smoke tests
+  cover both `kube-api` and `aws-api` scopes.
 
 ## Infrastructure
 

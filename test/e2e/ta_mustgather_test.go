@@ -16,6 +16,10 @@ var _ = Describe("must_gather", func() {
 		tgt := tgt
 
 		Describe(tgt.Name, func() {
+			BeforeEach(func() {
+				skipUnlessLiveAction(tgt, "must_gather")
+			})
+
 			It("rejects missing gather parameter", func() {
 				out := runActionExpectFailure(tgt, "must_gather")
 				// Missing CLI flag → API validateParams before TA Validate.
