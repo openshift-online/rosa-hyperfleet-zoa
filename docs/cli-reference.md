@@ -130,6 +130,44 @@ zoa audit --since 7d --target my-cluster
 zoa audit --since 2026-08-01 --until 2026-08-15
 ```
 
+## HyperFleet DB actions
+
+`get_db_resource` and `list_db_gvks` read HyperFleet control-plane resources directly from the hyperfleet-db (Aurora PostgreSQL), bypassing the Kubernetes API. They run on the RC ZOA and authenticate to the database with an RDS IAM token. The table holds the HyperFleet API custom resources (`hyperfleet.io/v1alpha1`): `Cluster`, `NodePool`, `Placement`, `DNSReservation`, `Index`, `OidcConfig` (all namespaced, one namespace per hosted cluster: `cluster-<uuid>`), and `ManagementCluster` (cluster-scoped).
+
+Resources are keyed by GVK (`Group/Version/Kind`). The core group has an empty group, so if a core resource is ever present its GVK starts with a leading slash (e.g. `/v1/ConfigMap`).
+
+By default the output is a kubectl-style summary table (NAMESPACE, NAME, VERSION, AGE, STATE). Add `-v` for the full objects (spec/status/metadata) or `-o json` to pipe into `jq`.
+
+```bash
+# Discover which resource types exist (with object counts). Run this first.
+zoa run list_db_gvks --jira ROSAENG-1234
+
+# List all objects of a type across every namespace
+zoa run get_db_resource --jira ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1/Cluster -A
+
+# List a type within a single hosted-cluster namespace
+zoa run get_db_resource --jira ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1/NodePool -n cluster-38ae9f84-aa1f-48bd-89e8-2d4611404fa1
+
+# Get a namespaced resource by name (returns the single resource)
+zoa run get_db_resource --jira ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1/Cluster -n cluster-38ae9f84-aa1f-48bd-89e8-2d4611404fa1 --name jaime1
+
+# Get the cluster-scoped ManagementCluster by name (no namespace)
+zoa run get_db_resource --jira ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1/ManagementCluster --name mc-01
+
+# Full objects (spec/status/metadata) instead of the summary table
+zoa run get_db_resource --jira ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1/Cluster -A -v
+
+# Pipe the full objects into jq
+zoa run get_db_resource --jira ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1/Cluster -A -o json | jq '.[].spec'
+```
+
+**Notes:**
+
+- Run `list_db_gvks` first. A Kind that is not present in the DB returns an empty result rather than an error, so it doubles as a way to confirm the exact GVK string.
+- With no `--name`, the action lists; with `--name`, it returns the single matching resource or a not-found error (mirrors `kubectl get <kind> <name>`).
+- Omitting `-n`/`-A` lists across all namespaces. `ManagementCluster` is the only cluster-scoped kind (stored with an empty namespace); the rest live in a per-hosted-cluster `cluster-<uuid>` namespace.
+- Fully-deleted objects are always excluded; objects still holding finalizers (mid-deletion) are shown as `Terminating`, matching the operator's own view.
+
 ## Global Flags
 
 | Flag | Short | Env Var | Description |
