@@ -60,6 +60,10 @@ var _ = Describe("list_db_gvks", func() {
 		}
 
 		Describe(tgt.Name, func() {
+			BeforeEach(func() {
+				skipUnlessLiveAction(tgt, "list_db_gvks")
+			})
+
 			// Backbone: proves the RC Lambda can auth to Aurora (RDS IAM), reach
 			// it across the VPC, and query the live schema. Succeeding with zero
 			// rows is a valid, meaningful pass.
@@ -86,6 +90,10 @@ var _ = Describe("get_db_resource", func() {
 		}
 
 		Describe(tgt.Name, func() {
+			BeforeEach(func() {
+				skipUnlessLiveAction(tgt, "get_db_resource")
+			})
+
 			// --- Backbone: data-independent, always run ---
 
 			It("reaches the hyperfleet-db for a well-formed GVK", func() {

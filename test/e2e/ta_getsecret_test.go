@@ -14,6 +14,10 @@ var _ = Describe("get_secret", func() {
 		tgt := tgt
 
 		Describe(tgt.Name, func() {
+			BeforeEach(func() {
+				skipUnlessLiveAction(tgt, "get_secret")
+			})
+
 			It("lists secrets in a normal namespace (metadata only, no data)", func() {
 				exec := runAction(tgt, "get_secret", "--namespace", "kube-system")
 				rows := outputArray(exec) // nil is fine — zero secrets is a valid outcome

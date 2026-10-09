@@ -11,9 +11,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// E2E conformance — dynamically ensures every Trusted Action reported by
-// each live Lambda has e2e coverage. RC and MC registries differ when a TA
-// declares DeploymentTargets for only one endpoint.
+// E2E conformance — every TA on each live Lambda must have ta_* e2e coverage.
+// Catalog may run ahead of the deployed image; ta_* specs skip missing actions.
+// RC and MC registries differ when a TA declares DeploymentTargets for only one endpoint.
 
 var _ = Describe("e2e conformance", func() {
 	taTestFileContents := func() map[string]string {
@@ -55,13 +55,6 @@ var _ = Describe("e2e conformance", func() {
 				}
 			})
 
-			It("live registry matches DeploymentTargets for this endpoint", func() {
-				live := liveActionNames(tgt)
-				want := expectedActionsForDeployment(tgt.DeploymentTarget)
-				Expect(live).To(Equal(want),
-					"live registry on %s (%s) should match pkg/actions DeploymentTargets — "+
-						"deployed Lambda may be stale or metadata drifted", tgt.Name, tgt.DeploymentTarget)
-			})
 		})
 	}
 

@@ -14,6 +14,10 @@ var _ = Describe("rollout_restart", func() {
 		tgt := tgt
 
 		Describe(tgt.Name, func() {
+			BeforeEach(func() {
+				skipUnlessLiveAction(tgt, "rollout_restart")
+			})
+
 			// Smoke-level coverage stays --dry-run: consumer repos
 			// (rosa-hyperfleet, rosa-hyperfleet-api) run this on every
 			// on-demand-e2e/nightly-ephemeral job via `make
