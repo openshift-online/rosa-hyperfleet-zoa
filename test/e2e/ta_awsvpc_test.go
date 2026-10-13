@@ -14,6 +14,10 @@ var _ = Describe("VPC endpoint aws-api actions", func() {
 		tgt := tgt
 
 		Describe(tgt.Name, func() {
+			BeforeEach(func() {
+				skipUnlessLiveActions(tgt, "list_vpc_endpoints", "describe_vpc_endpoint")
+			})
+
 			It("lists VPC endpoints and describes the first one, if any exist", func() {
 				list := runAction(tgt, "list_vpc_endpoints")
 				out := outputMap(list)

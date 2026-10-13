@@ -14,6 +14,10 @@ var _ = Describe("get_resource", func() {
 		tgt := tgt
 
 		Describe(tgt.Name, func() {
+			BeforeEach(func() {
+				skipUnlessLiveAction(tgt, "get_resource")
+			})
+
 			It("lists cluster-scoped resources (nodes)", Label("smoke"), func() {
 				exec := runAction(tgt, "get_resource", "--resource", "nodes")
 				rows := outputArray(exec)

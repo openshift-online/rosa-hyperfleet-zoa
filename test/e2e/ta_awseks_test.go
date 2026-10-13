@@ -14,6 +14,10 @@ var _ = Describe("list_eks_clusters", func() {
 		tgt := tgt
 
 		Describe(tgt.Name, func() {
+			BeforeEach(func() {
+				skipUnlessLiveAction(tgt, "list_eks_clusters")
+			})
+
 			// Smoke test: Verifies aws-api scope works (STS AssumeRole, AWS SDK call).
 			// Fast (~1s) and read-only.
 			It("lists EKS clusters in the account", Label("smoke"), func() {
@@ -35,6 +39,10 @@ var _ = Describe("describe_eks_cluster", func() {
 		tgt := tgt
 
 		Describe(tgt.Name, func() {
+			BeforeEach(func() {
+				skipUnlessLiveAction(tgt, "describe_eks_cluster")
+			})
+
 			It("describes an existing cluster", func() {
 				// Validate the TA round-trip only — not that unrelated EKS
 				// clusters in a shared ephemeral account happen to be ACTIVE.

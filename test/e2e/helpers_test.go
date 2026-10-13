@@ -13,7 +13,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
+	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot-import is the Gomega/Ginkgo convention
 	"github.com/openshift-online/rosa-hyperfleet-zoa/pkg/actions"
 )
@@ -371,6 +373,56 @@ func expectedActionsForDeployment(deploymentTarget string) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+var liveActionSetCache sync.Map // key: deploymentTarget|apiURL → map[string]bool
+
+func liveActionSet(tgt target) map[string]bool {
+	key := tgt.DeploymentTarget + "|" + tgt.APIURL
+	if cached, ok := liveActionSetCache.Load(key); ok {
+		return cached.(map[string]bool)
+	}
+	set := make(map[string]bool)
+	for _, name := range liveActionNames(tgt) {
+		set[name] = true
+	}
+	liveActionSetCache.Store(key, set)
+	return set
+}
+
+// skipUnlessLiveAction skips the current spec when the deployed Lambda does not
+// register action yet (catalog ahead of promoted image). Live ⊆ catalog is
+// checked elsewhere; this avoids running ta_* specs against missing handlers.
+func skipUnlessLiveAction(tgt target, action string) {
+	if !liveActionSet(tgt)[action] {
+		ginkgo.Skip(fmt.Sprintf(
+			"action %q is not registered on %s — deployed Lambda may lag pkg/actions catalog",
+			action, tgt.Name))
+	}
+}
+
+// skipUnlessLiveActions skips when any of the actions is missing on the endpoint.
+func skipUnlessLiveActions(tgt target, actions ...string) {
+	set := liveActionSet(tgt)
+	for _, action := range actions {
+		if !set[action] {
+			ginkgo.Skip(fmt.Sprintf(
+				"action %q is not registered on %s — deployed Lambda may lag pkg/actions catalog",
+				action, tgt.Name))
+		}
+	}
+}
+
+// expectLiveActionsInCatalog asserts every name returned by the live Lambda is
+// declared in pkg/actions for this deployment target (allows catalog > image).
+func expectLiveActionsInCatalog(tgt target, live []string) {
+	catalog := expectedActionsForDeployment(tgt.DeploymentTarget)
+	for _, name := range live {
+		Expect(catalog).To(ContainElement(name),
+			"live TA %q on %s is not in pkg/actions DeploymentTargets for %q — "+
+				"server may be ahead of the zoa source revision under test",
+			name, tgt.Name, tgt.DeploymentTarget)
+	}
 }
 
 // liveActionNames queries a target's Lambda for registered TA names (already

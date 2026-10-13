@@ -14,6 +14,10 @@ var _ = Describe("delete_pod", func() {
 		tgt := tgt
 
 		Describe(tgt.Name, func() {
+			BeforeEach(func() {
+				skipUnlessLiveAction(tgt, "delete_pod")
+			})
+
 			It("deletes a real coredns pod via ZOA", func() {
 				before := coreDNSPodNames(tgt)
 				Expect(before).NotTo(BeEmpty(), "coredns pods not found (selector %q in %s)", coreDNSSelector, coreDNSNamespace)
