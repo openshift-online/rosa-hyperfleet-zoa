@@ -293,7 +293,7 @@ make test-e2e-monitoring   # monitoring only (ginkgo -vv + junit)
 RC and MC run in **parallel** automatically (separate `go test` processes, one per target). Each
 process runs its specs sequentially. If you only set one URL, only that target runs.
 
-Each target carries a `DeploymentTarget` field (`"rc"` or `"mc"`) derived from which URL env var was set. Specs
+Each e2e `target` carries a `TargetType` field (`"rc"` or `"mc"`) derived from which URL env var was set. Specs
 use this to pick the correct `--gather` value and expected tarball layout without hard-coding RC vs
 MC — so the same test file is safe under parallel execution (each process only sees one target).
 

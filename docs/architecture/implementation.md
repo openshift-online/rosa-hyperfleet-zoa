@@ -203,7 +203,7 @@ All configuration via environment variables (Terraform-managed):
 | `AUDIT_TABLE` | — | api | DynamoDB audit table |
 | `ARTIFACT_BUCKET` | — | both | S3 bucket for output/logs |
 | `TARGET_CLUSTER` | — | both | Target EKS cluster identifier |
-| `ZOA_DEPLOYMENT_TARGET` | — | both | ZOA deployment target: `rc` or `mc` (TA registry filter + validation) |
+| `ZOA_TARGET_TYPE` | — | api, worker | Target type `rc` or `mc` (TA registry filter; Terraform `target_type` → this env on API/Worker Lambda). Boundary tasks get it from Access at `RunTask`. Access Lambda does not require it. |
 | `EKS_CLUSTER_ENDPOINT` | — | both | EKS API server URL |
 | `EKS_CLUSTER_CA` | — | both | Base64-encoded CA certificate |
 | `EKS_CLUSTER_NAME` | — | both | Cluster name (for token generation) |

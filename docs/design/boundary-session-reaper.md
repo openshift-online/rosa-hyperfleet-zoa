@@ -49,7 +49,7 @@ Access injects at `RunTask` (in addition to task-definition defaults):
 
 | Env                                           | Purpose                                                                        |
 | --------------------------------------------- | ------------------------------------------------------------------------------ |
-| `ZOA_DEPLOYMENT_TARGET`                       | `rc` or `mc` (lowercased from target metadata) — selects baked TA catalog file |
+| `ZOA_TARGET_TYPE`                             | `rc` or `mc` (lowercased from target metadata) — selects baked TA catalog file |
 | `ZOA_SESSION_ID` / `ZOA_OPERATOR`             | Session facts in `ZOA_SESSION.md`                                              |
 | `ZOA_API_URL`, `ZOA_TARGET`, `ZOA_DEPLOYMENT` | Existing boundary wiring                                                       |
 
