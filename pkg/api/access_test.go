@@ -60,7 +60,12 @@ func (m *mockSessionStoreAccess) UpdateStatus(_ context.Context, id string, _, t
 		if s.SessionID == id {
 			s.Status = to
 			if reason, ok := updates["stopReason"]; ok {
-				s.StopReason = reason.(string)
+				switch v := reason.(type) {
+				case store.StopReason:
+					s.StopReason = string(v)
+				case string:
+					s.StopReason = v
+				}
 			}
 			if arn, ok := updates["taskArn"]; ok {
 				s.TaskArn = arn.(string)
@@ -691,4 +696,289 @@ func TestAccessHandler_WhenSessionStartStoreFails_ItShouldReturn500(t *testing.T
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d: %s", rr.Code, rr.Body.String())
 	}
+}
+
+// --- Additional coverage tests ---
+
+func TestAccessHandler_WhenSessionListStatusFilter_ItShouldFilterByStatus(t *testing.T) {
+	sessions := &mockSessionStoreAccess{
+		sessions: []*store.Session{
+			{SessionID: "s1", Operator: "slopezma", Status: store.SessionStatusActive},
+			{SessionID: "s2", Operator: "slopezma", Status: store.SessionStatusTerminated},
+		},
+	}
+	h := testAccessHandler(sessions, &mockTargetStoreAccess{})
+
+	rr := doAccessRequest(h, "GET", "/api/v0/sessions?scope=mine&status=active", nil, accessHeaders())
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	json.NewDecoder(rr.Body).Decode(&resp)
+	count := int(resp["count"].(float64))
+	if count != 1 {
+		t.Errorf("expected count=1 (active only), got %d", count)
+	}
+}
+
+func TestAccessHandler_WhenSessionListAllScope_ItShouldReturnAllSessions(t *testing.T) {
+	sessions := &mockSessionStoreAccess{
+		sessions: []*store.Session{
+			{SessionID: "s1", Operator: "slopezma", Status: store.SessionStatusActive},
+			{SessionID: "s2", Operator: "other", Status: store.SessionStatusActive},
+		},
+	}
+	h := testAccessHandler(sessions, &mockTargetStoreAccess{})
+
+	rr := doAccessRequest(h, "GET", "/api/v0/sessions", nil, accessHeaders())
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	json.NewDecoder(rr.Body).Decode(&resp)
+	count := int(resp["count"].(float64))
+	if count != 2 {
+		t.Errorf("expected count=2 (all sessions), got %d", count)
+	}
+}
+
+func TestAccessHandler_WhenSessionListWithOperatorFilter_ItShouldFilterByOperator(t *testing.T) {
+	sessions := &mockSessionStoreAccess{
+		sessions: []*store.Session{
+			{SessionID: "s1", Operator: "slopezma", Status: store.SessionStatusActive},
+			{SessionID: "s2", Operator: "other", Status: store.SessionStatusActive},
+		},
+	}
+	h := testAccessHandler(sessions, &mockTargetStoreAccess{})
+
+	rr := doAccessRequest(h, "GET", "/api/v0/sessions?operator=other", nil, accessHeaders())
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	json.NewDecoder(rr.Body).Decode(&resp)
+	count := int(resp["count"].(float64))
+	if count != 1 {
+		t.Errorf("expected count=1 (other only), got %d", count)
+	}
+}
+
+func TestAccessHandler_WhenSessionListMineInvalidIdentity_ItShouldReturn400(t *testing.T) {
+	h := testAccessHandler(&mockSessionStoreAccess{}, &mockTargetStoreAccess{})
+
+	rr := doAccessRequest(h, "GET", "/api/v0/sessions?scope=mine", nil, map[string]string{
+		"X-Operator": "not-a-valid-arn",
+	})
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAccessHandler_WhenSessionListWithLimitParam_ItShouldSetLimit(t *testing.T) {
+	sessions := &mockSessionStoreAccess{}
+	h := testAccessHandler(sessions, &mockTargetStoreAccess{})
+
+	rr := doAccessRequest(h, "GET", "/api/v0/sessions?limit=10", nil, accessHeaders())
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAccessHandler_WhenSessionJoinNotFound_ItShouldReturn404(t *testing.T) {
+	h := testAccessHandler(&mockSessionStoreAccess{}, &mockTargetStoreAccess{})
+
+	rr := doAccessRequest(h, "POST", "/api/v0/sessions/join/nonexistent", nil, accessHeaders())
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAccessHandler_WhenSessionJoinTerminatedSession_ItShouldReturn409(t *testing.T) {
+	sessions := &mockSessionStoreAccess{
+		sessions: []*store.Session{
+			{
+				SessionID: "session-done",
+				Operator:  "slopezma",
+				Status:    store.SessionStatusTerminated,
+			},
+		},
+	}
+	h := testAccessHandler(sessions, &mockTargetStoreAccess{})
+
+	rr := doAccessRequest(h, "POST", "/api/v0/sessions/join/session-done", nil, accessHeaders())
+
+	if rr.Code != http.StatusConflict {
+		t.Errorf("expected 409, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAccessHandler_WhenSessionJoinInvalidIdentity_ItShouldReturn400(t *testing.T) {
+	h := testAccessHandler(&mockSessionStoreAccess{}, &mockTargetStoreAccess{})
+
+	rr := doAccessRequest(h, "POST", "/api/v0/sessions/join/session-123", nil, map[string]string{
+		"X-Operator": "bad-arn",
+	})
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAccessHandler_WhenSessionExecAttachedNotFound_ItShouldReturn404(t *testing.T) {
+	h := testAccessHandler(&mockSessionStoreAccess{}, &mockTargetStoreAccess{})
+
+	body := sessionExecAttachedRequest{ExecSessionID: "k7zkjuilu2vhsrp76e48ie3ciy"}
+	rr := doAccessRequest(h, "POST", "/api/v0/sessions/exec-attached/nonexistent", body, accessHeaders())
+
+	// Session not found → 404 or 500 (depending on error path)
+	if rr.Code == http.StatusOK {
+		t.Errorf("expected error for nonexistent session, got 200")
+	}
+}
+
+func TestAccessHandler_WhenSessionExecAttachedByNonOwner_ItShouldReturn403(t *testing.T) {
+	sessions := &mockSessionStoreAccess{
+		sessions: []*store.Session{
+			{
+				SessionID: "session-123",
+				Operator:  "other-user",
+				Status:    store.SessionStatusActive,
+				TaskArn:   "arn:aws:ecs:us-east-1:123:task/cluster/task-abc",
+			},
+		},
+	}
+	h := testAccessHandler(sessions, &mockTargetStoreAccess{})
+
+	body := sessionExecAttachedRequest{ExecSessionID: "k7zkjuilu2vhsrp76e48ie3ciy"}
+	rr := doAccessRequest(h, "POST", "/api/v0/sessions/exec-attached/session-123", body, accessHeaders())
+
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAccessHandler_WhenSessionExecAttachedInvalidBody_ItShouldReturn400(t *testing.T) {
+	sessions := &mockSessionStoreAccess{
+		sessions: []*store.Session{
+			{
+				SessionID: "session-123",
+				Operator:  "slopezma",
+				Status:    store.SessionStatusActive,
+			},
+		},
+	}
+	h := testAccessHandler(sessions, &mockTargetStoreAccess{})
+
+	body := sessionExecAttachedRequest{ExecSessionID: "bad!!"}
+	rr := doAccessRequest(h, "POST", "/api/v0/sessions/exec-attached/session-123", body, accessHeaders())
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid exec session ID, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAccessHandler_WhenSessionExecAttachedInvalidIdentity_ItShouldReturn400(t *testing.T) {
+	h := testAccessHandler(&mockSessionStoreAccess{}, &mockTargetStoreAccess{})
+
+	body := sessionExecAttachedRequest{ExecSessionID: "k7zkjuilu2vhsrp76e48ie3ciy"}
+	rr := doAccessRequest(h, "POST", "/api/v0/sessions/exec-attached/session-123", body, map[string]string{
+		"X-Operator": "bad-arn",
+	})
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAccessHandler_WhenSessionTerminateAlreadyTerminated_ItShouldReturn409(t *testing.T) {
+	sessions := &mockSessionStoreAccess{
+		sessions: []*store.Session{
+			{
+				SessionID: "session-123",
+				Operator:  "slopezma",
+				Status:    store.SessionStatusTerminated,
+			},
+		},
+	}
+	h := testAccessHandler(sessions, &mockTargetStoreAccess{})
+
+	rr := doAccessRequest(h, "POST", "/api/v0/sessions/terminate/session-123", nil, accessHeaders())
+
+	if rr.Code != http.StatusConflict {
+		t.Errorf("expected 409, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAccessHandler_WhenSessionStartInvalidReason_ItShouldReturn400(t *testing.T) {
+	h := testAccessHandler(&mockSessionStoreAccess{}, &mockTargetStoreAccess{
+		targets: []*store.Target{{TargetID: "mc01", Region: "us-east-1"}},
+	})
+	body := sessionStartRequest{DeploymentName: "us-east-1", Target: "mc01", Reason: "abc"}
+	rr := doAccessRequest(h, "POST", "/api/v0/sessions/start", body, accessHeaders())
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]interface{}
+	json.NewDecoder(rr.Body).Decode(&resp)
+	if resp["code"] != "invalid_reason" {
+		t.Errorf("expected code=invalid_reason, got %v", resp["code"])
+	}
+}
+
+func TestAccessHandler_WhenSessionStartWithRunTask_ItShouldHandleRunTaskFailure(t *testing.T) {
+	targets := &mockTargetStoreAccess{
+		targets: []*store.Target{
+			{
+				TargetID:          "mc01",
+				SubnetIds:         "subnet-a",
+				SecurityGroupId:   "sg-1",
+				EcsClusterArn:     "arn:aws:ecs:us-east-1:123456789012:cluster/test",
+				TaskDefinitionArn: "arn:aws:ecs:us-east-1:123456789012:task-definition/td:1",
+				FunctionUrl:       "https://test.lambda-url.us-east-1.on.aws",
+			},
+		},
+	}
+	sessions := &mockSessionStoreAccess{
+		sessions: []*store.Session{
+			{
+				SessionID:      "session-123",
+				Operator:       "slopezma",
+				TargetCluster:  "mc01",
+				DeploymentName: "us-east-1",
+				Reason:         "ROSAENG-5678",
+				Status:         store.SessionStatusCreating,
+				Deadline:       "2030-01-01T00:00:00Z",
+			},
+		},
+	}
+	h := testAccessHandlerWithECS(sessions, targets)
+	h.ecsClient = &mockECSAccessError{runErr: fmt.Errorf("ResourceNotFoundException")}
+
+	rr := doAccessRequest(h, "POST", "/api/v0/sessions/join/session-123", nil, accessHeaders())
+
+	if rr.Code == http.StatusOK {
+		t.Fatalf("expected failure when RunTask errors, got 200")
+	}
+}
+
+type mockECSAccessError struct {
+	runErr  error
+	stopErr error
+}
+
+func (m *mockECSAccessError) RunTask(_ context.Context, _ *RunTaskInput) (*RunTaskOutput, error) {
+	return nil, m.runErr
+}
+func (m *mockECSAccessError) StopTask(_ context.Context, _ *StopTaskInput) error {
+	return m.stopErr
 }

@@ -65,11 +65,18 @@ RUN curl --silent --location --fail \
 
 
 # --------------------------------------------------------------------------
-# aws-cli-builder — AWS CLI v2 (arch-matched zip, same pattern as kubectl)
+# aws-cli-builder — AWS CLI v2 (pinned version, arch-matched zip)
+# AWS publishes versioned zips (awscli-exe-linux-<arch>-<version>.zip) and PGP
+# .sig files, but no per-version SHA256 sidecar. Unversioned (latest) SHA256
+# does exist but would mismatch a pinned version. We rely on the version pin
+# for content integrity (deterministic download) and verify the installed
+# version matches the pin after install.
 # --------------------------------------------------------------------------
 FROM ${BASE_IMAGE} AS aws-cli-builder
 
 ARG TARGETARCH=amd64
+# renovate: datasource=github-releases depName=aws/aws-cli extractVersion=^(?<version>\d+\.\d+\.\d+)$
+ARG AWS_CLI_VERSION="2.27.22"
 
 RUN microdnf install --assumeyes --nodocs unzip && microdnf clean all
 
@@ -78,10 +85,14 @@ WORKDIR /aws-dl
 RUN AWS_ARCH="${TARGETARCH}" \
     && if [ "${AWS_ARCH}" = "amd64" ]; then AWS_ARCH="x86_64"; fi \
     && curl --silent --location --fail \
-        "https://awscli.amazonaws.com/awscli-exe-linux-${AWS_ARCH}.zip" \
+        "https://awscli.amazonaws.com/awscli-exe-linux-${AWS_ARCH}-${AWS_CLI_VERSION}.zip" \
         --output awscli.zip \
     && unzip -q awscli.zip \
     && ./aws/install --install-dir /opt/aws-cli --bin-dir /opt/aws-bin \
+    && INSTALLED="$(/opt/aws-bin/aws --version | awk '{print $1}' | cut -d/ -f2)" \
+    && if [ "${INSTALLED}" != "${AWS_CLI_VERSION}" ]; then \
+         echo "ERROR: expected aws-cli/${AWS_CLI_VERSION}, got ${INSTALLED}" >&2; exit 1; \
+       fi \
     && rm --recursive --force aws awscli.zip
 
 

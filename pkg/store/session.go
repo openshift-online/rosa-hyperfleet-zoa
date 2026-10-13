@@ -24,12 +24,14 @@ const (
 	SessionStatusFailed     SessionStatus = "failed"
 )
 
-// StopReason values stored in DynamoDB (stopReason). Bounded enum for audit + metrics.
+// StopReason is why a boundary session was terminated. Stored in DynamoDB (stopReason).
+type StopReason string
+
 const (
-	StopReasonOperatorStop       = "operatorStop"
-	StopReasonDeadlineReaperStop = "deadlineReaperStop"
-	StopReasonIdleReaperStop     = "idleReaperStop"
-	StopReasonProvisionFailed    = "provisionFailed"
+	StopReasonOperatorStop       StopReason = "operatorStop"
+	StopReasonDeadlineReaperStop StopReason = "deadlineReaperStop"
+	StopReasonIdleReaperStop     StopReason = "idleReaperStop"
+	StopReasonProvisionFailed    StopReason = "provisionFailed"
 )
 
 // Session represents a ZOA Boundary session in DynamoDB.

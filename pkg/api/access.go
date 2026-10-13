@@ -175,6 +175,7 @@ func (h *AccessHandler) handleSessionStart(w http.ResponseWriter, r *http.Reques
 	}
 
 	var req sessionStartRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "invalid JSON body")
 		return
@@ -442,7 +443,7 @@ func (h *AccessHandler) handleSessionTerminate(w http.ResponseWriter, r *http.Re
 		if err := ecs.StopTask(ctx, &StopTaskInput{
 			Cluster: session.EcsCluster,
 			TaskArn: session.TaskArn,
-			Reason:  store.StopReasonOperatorStop,
+			Reason:  string(store.StopReasonOperatorStop),
 		}); err != nil {
 			h.logger.Error("failed to stop ECS task", "session_id", sessionID, "task_arn", session.TaskArn, "error", err)
 			writeError(w, http.StatusBadGateway, "task_terminate_failed", "failed to terminate boundary ECS task; session is still active")
@@ -510,7 +511,15 @@ func (h *AccessHandler) handleSessionJoin(w http.ResponseWriter, r *http.Request
 
 	if err := h.ensureBoundaryTask(ctx, session); err != nil {
 		h.logger.Error("failed to ensure boundary task", "session_id", sessionID, "error", err)
-		writeError(w, http.StatusInternalServerError, "ecs_error", "failed to start boundary container")
+		code := "ecs_error"
+		msg := "failed to start boundary container"
+		status := http.StatusBadGateway
+		if strings.Contains(err.Error(), "updating session") {
+			code = "session_update_error"
+			msg = "boundary task started but session state update failed"
+			status = http.StatusInternalServerError
+		}
+		writeError(w, status, code, msg)
 		return
 	}
 
@@ -575,6 +584,7 @@ func (h *AccessHandler) handleSessionExecAttached(w http.ResponseWriter, r *http
 	}
 
 	var req sessionExecAttachedRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "invalid JSON body")
 		return

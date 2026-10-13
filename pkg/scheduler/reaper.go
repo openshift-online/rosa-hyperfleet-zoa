@@ -191,12 +191,12 @@ func (r *Reaper) filterByTargetCluster(sessions []*store.Session) []*store.Sessi
 	return filtered
 }
 
-func (r *Reaper) terminateSession(ctx context.Context, session *store.Session, reason string) error {
+func (r *Reaper) terminateSession(ctx context.Context, session *store.Session, reason store.StopReason) error {
 	log := r.logger.With("session_id", session.SessionID, "operator", session.Operator, "stop_reason", reason)
 
 	if session.TaskArn != "" && session.EcsCluster != "" && r.ecs != nil {
 		log.Info("reaper: stopping ECS task", "task_arn", session.TaskArn)
-		if err := r.ecs.StopTask(ctx, session.EcsCluster, session.TaskArn, reason); err != nil {
+		if err := r.ecs.StopTask(ctx, session.EcsCluster, session.TaskArn, string(reason)); err != nil {
 			log.Error("reaper: failed to stop ECS task", "error", err)
 			return fmt.Errorf("stop task %s: %w", session.SessionID, err)
 		}
