@@ -18,21 +18,6 @@ ZOA is built on three operational pillars. The boundary is always the entry poin
 | **Trusted Actions** | ✅ Shipped | Pre-defined, RBAC-scoped Go operations invoked via `zoa run` from the boundary | The **only supported way** to read or change fleet state. Each TA creates an ephemeral ServiceAccount + Role, destroyed on completion. |
 | **Break-glass** | 🔲 Planned | Scoped emergency `kubectl`/`aws` from the boundary, approval-gated | For situations no TA covers. Not implemented — see [break-glass/README.md](docs/break-glass/README.md). |
 
-```
- ┌──────────────────────────────────────────────────────────────────┐
- │                        ZOA Boundary                              │
- │              Session + ECS Exec + audit + tools                  │
- │                                                                  │
- │   ┌─────────────────────┐         ┌──────────────────────┐      │
- │   │   Trusted Actions    │         │     Break-glass      │      │
- │   │                      │         │                      │      │
- │   │   zoa run <action>   │         │   Scoped kubectl     │      │
- │   │   RBAC-scoped        │         │   Approval-gated     │      │
- │   │   ✅ Day-to-day      │         │   🔲 Emergency       │      │
- │   └─────────────────────┘         └──────────────────────┘      │
- └──────────────────────────────────────────────────────────────────┘
-```
-
 **Every operator path starts with `zoa session start`** — there is no laptop-side `kubectl` or `zoa run`. The boundary is the shell; TAs and (future) break-glass are what you do inside it.
 
 **Break-glass → TA lifecycle:** every break-glass use **must** produce a follow-up Trusted Action that covers the same operation. Break-glass is a one-time escape hatch, not a permanent workflow. The expectation is that the TA catalog grows monotonically — each emergency teaches the system a new operation so that next time it runs through the audited, RBAC-scoped TA path instead of raw cluster access.
@@ -43,11 +28,11 @@ ZOA is built on three operational pillars. The boundary is always the entry poin
 |-----------|----------|---------|--------|
 | **CLI (`zoa`)** | `zoa` binary | SRE laptop · boundary task | All — **session lifecycle** on the laptop; **TA execution** from inside the boundary |
 | **ZOA Boundary** | `zoa-boundary` image | ECS Fargate (per target VPC) | Boundary — audited operator environment; ECS Exec transcript to CloudWatch |
-| **Access Lambda** | `zoa-lambda` (`HANDLER_MODE=access`) | Lambda (RC account, no VPC) | Boundary — session plane: start/terminate/list/history, targets; `ecs:RunTask` |
-| **API Lambda** | `zoa-lambda` (`HANDLER_MODE=api`) | Lambda (per target VPC) | TAs — execution plane: `zoa run`, sync TAs, audit reads; **identity bridge** (task ARN → session → operator) |
-| **Worker Lambda** | `zoa-lambda` (`HANDLER_MODE=worker`) | Lambda (per target VPC) | Boundary + TAs — reconciler, GC, async TA dispatch, session **reaper** |
-| **Async runner** | `zoa-runner` | K8s Job (target EKS) | TAs — long-running async TAs; uploads to S3 |
-| **Trusted Actions** | Go in `pkg/actions/` | Lambda + runner + boundary catalog | TAs — RBAC-scoped operations invoked via `zoa run` from the boundary |
+| **Access Lambda** | `zoa-lambda` image (`HANDLER_MODE=access`) | Lambda (RC account, no VPC) | Boundary — session plane: start/terminate/list/history, targets; `ecs:RunTask` |
+| **API Lambda** | `zoa-lambda` image (`HANDLER_MODE=api`) | Lambda (per target VPC) | TAs — execution plane: `zoa run`, sync TAs, audit reads; **identity bridge** (task ARN → session → operator) |
+| **Worker Lambda** | `zoa-lambda` image (`HANDLER_MODE=worker`) | Lambda (per target VPC) | Boundary + TAs — reconciler, GC, async TA dispatch, session **reaper** |
+| **Async runner** | `zoa-runner` image | K8s Job (target EKS) | TAs — long-running async TAs; uploads to S3 |
+| **Trusted Actions** | Go packages (`pkg/actions/`, compiled into Lambda/runner/boundary) | Lambda + runner + boundary catalog | TAs — RBAC-scoped operations invoked via `zoa run` from the boundary |
 
 **Three images** from this repo: **`zoa-lambda`** (one binary, three `HANDLER_MODE`s), **`zoa-runner`** (async TAs in EKS Jobs), **`zoa-boundary`** (audited operator shell).
 
