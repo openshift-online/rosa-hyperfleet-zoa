@@ -26,19 +26,8 @@ setup() {
   [ "${lines[1]}" = "/home/sre/.claude/ZOA_ACTIONS.md" ]
 }
 
-@test "zoa_target_type prefers ZOA_TARGET_TYPE over legacy ZOA_DEPLOYMENT_TARGET" {
-  run env ZOA_TARGET_TYPE="rc" ZOA_DEPLOYMENT_TARGET="mc" bash -c '
-    source "$1"
-    zoa_target_type
-  ' bash "${ENTRYPOINT}"
-
-  [ "${status}" -eq 0 ]
-  [ "${output}" = "rc" ]
-}
-
-@test "zoa_target_type falls back to ZOA_DEPLOYMENT_TARGET when ZOA_TARGET_TYPE unset" {
-  run env ZOA_DEPLOYMENT_TARGET="rc" bash -c '
-    unset ZOA_TARGET_TYPE
+@test "zoa_target_type uses ZOA_TARGET_TYPE when set" {
+  run env ZOA_TARGET_TYPE="rc" bash -c '
     source "$1"
     zoa_target_type
   ' bash "${ENTRYPOINT}"
@@ -49,7 +38,7 @@ setup() {
 
 @test "zoa_target_type defaults to mc when unset" {
   run bash -c '
-    unset ZOA_TARGET_TYPE ZOA_DEPLOYMENT_TARGET
+    unset ZOA_TARGET_TYPE
     source "$1"
     zoa_target_type
   ' bash "${ENTRYPOINT}"
@@ -81,23 +70,6 @@ setup() {
   [[ "${output}" == *"Target type | mc"* ]]
   [[ "${output}" == *"ZOA_ACTIONS.md"* ]]
   [[ "${output}" == *"offline render"* ]]
-}
-
-@test "write_zoa_session_md uses legacy ZOA_DEPLOYMENT_TARGET for target type row" {
-  run env \
-    ZOA_SESSION_ID="sess-1" \
-    ZOA_DEPLOYMENT_TARGET="rc" \
-    HOME="/tmp/zoa-bats-home-legacy" \
-    bash -c '
-      unset ZOA_TARGET_TYPE
-      rm -rf "${HOME}/.claude"
-      source "$1"
-      write_zoa_session_md
-      grep "Target type" "$(zoa_session_md_path)"
-    ' bash "${ENTRYPOINT}"
-
-  [ "${status}" -eq 0 ]
-  [[ "${output}" == *"Target type | rc"* ]]
 }
 
 @test "install_actions_catalog renders markdown via zoa actions --offline" {

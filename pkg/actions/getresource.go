@@ -29,7 +29,7 @@ func (g *getResource) Metadata() ActionMetadata {
 		ExecutionMode:     "sync",
 		Description:       "Get or list Kubernetes resources by type, namespace, name, or label/field selectors (including CRDs). Does not support Secrets — use get_secret instead (HCP namespace protection).",
 		Authorization:     AuthorizationConfig{Approval: "none"},
-		DeploymentTargets: []string{DeploymentTargetRC, DeploymentTargetMC},
+		TargetTypes: []string{TargetTypeRC, TargetTypeMC},
 		TimeoutSeconds:    60,
 		Examples: []string{
 			"zoa run get_resource --resource pods -n openshift-ingress --reason ROSAENG-1234",

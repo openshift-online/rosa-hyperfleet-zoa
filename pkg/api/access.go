@@ -390,6 +390,11 @@ func (h *AccessHandler) handleSessionList(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Audit cross-operator queries (session history) but not self-service list (scope=mine).
+	if q.Get("scope") != "mine" {
+		h.recordAccessAudit(r, http.StatusOK, "session_history", "", "")
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{"items": sessions, "count": len(sessions)})
 }
 

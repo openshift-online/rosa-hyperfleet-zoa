@@ -77,6 +77,7 @@ func TestTAParamBindings_WhenComparedToActionCatalog_ItShouldCoverCommonDedicate
 		"field_selector":         true,
 		"extra_namespaces":       true,
 		"skip_must_gather_image": true,
+		"gvk":                    true, // get_db_resource — use --param gvk=...
 	}
 
 	allCatalogParams := make(map[string]bool)

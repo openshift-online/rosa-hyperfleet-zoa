@@ -117,7 +117,7 @@ func TestPrintSessionTable_WhenWide_ItShouldIncludeIdentityColumns(t *testing.T)
 	}
 }
 
-func TestResolveDeploymentTarget(t *testing.T) {
+func TestResolveSessionStartArgs(t *testing.T) {
 	tests := []struct {
 		name           string
 		args           []string
@@ -165,7 +165,7 @@ func TestResolveDeploymentTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			deployment, target := resolveDeploymentTarget(tt.args, tt.flagDeployment, tt.flagTarget)
+			deployment, target := resolveSessionStartArgs(tt.args, tt.flagDeployment, tt.flagTarget)
 			if deployment != tt.wantDeployment {
 				t.Errorf("deployment = %q, want %q", deployment, tt.wantDeployment)
 			}

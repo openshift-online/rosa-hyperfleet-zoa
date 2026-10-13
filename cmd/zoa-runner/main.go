@@ -58,7 +58,7 @@ func main() {
 	logger = logger.With("execution_id", executionID, "action", actionName)
 	logger.Info("zoa-runner starting")
 
-	actions.SetDeploymentTarget(config.TargetTypeFromEnv())
+	actions.SetTargetType(config.TargetTypeFromEnv())
 
 	action, ok := actions.Get(actionName)
 	if !ok {
@@ -99,7 +99,7 @@ func main() {
 	execParams := &actions.ExecutionParams{
 		Params:           params,
 		ExecutionID:      executionID,
-		DeploymentTarget: config.TargetTypeFromEnv(),
+		TargetType: config.TargetTypeFromEnv(),
 		Logger:           execLogger,
 	}
 

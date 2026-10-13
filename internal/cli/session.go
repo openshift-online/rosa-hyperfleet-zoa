@@ -66,7 +66,7 @@ on the session, Access audit, and the boundary task (ZOA_REASON) for zoa run.`,
   zoa session start -d us-east-1 -t mc01 --reason ROSAENG-1234 --no-connect -o json`,
 		Args: cobra.MaximumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			deployment, target := resolveDeploymentTarget(args, flagDeployment, flagTarget)
+			deployment, target := resolveSessionStartArgs(args, flagDeployment, flagTarget)
 			if deployment == "" {
 				return fmt.Errorf("deployment is required: zoa session start <deployment> <target>")
 			}
@@ -452,9 +452,9 @@ func printSessionTable(w io.Writer, opts *GlobalOptions, deployment string, list
 	return tw.Flush()
 }
 
-// resolveDeploymentTarget resolves deployment and target from positional args
+// resolveSessionStartArgs resolves deployment and target from positional args
 // or flag fallbacks. Positional args take precedence over flags.
-func resolveDeploymentTarget(args []string, flagDeployment, flagTarget string) (deployment, target string) {
+func resolveSessionStartArgs(args []string, flagDeployment, flagTarget string) (deployment, target string) {
 	switch len(args) {
 	case 2:
 		return args[0], args[1]

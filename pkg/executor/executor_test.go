@@ -15,8 +15,8 @@ import (
 )
 
 func TestValidateAction_WhenMustGatherGatherInvalidForDeployment_ItShouldFail(t *testing.T) {
-	actions.SetDeploymentTarget("mc")
-	t.Cleanup(func() { actions.SetDeploymentTarget("") })
+	actions.SetTargetType("mc")
+	t.Cleanup(func() { actions.SetTargetType("") })
 
 	action, ok := actions.Get("must_gather")
 	if !ok {
@@ -26,7 +26,7 @@ func TestValidateAction_WhenMustGatherGatherInvalidForDeployment_ItShouldFail(t 
 	e := &Executor{
 		kubeClient:       fake.NewClientset(),
 		restConfig:       &rest.Config{Host: "https://localhost:6443"},
-		deploymentTarget: "mc",
+		targetType: "mc",
 		logger:           noopLogger(),
 	}
 

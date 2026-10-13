@@ -12,8 +12,8 @@ func registeredActionNames() []string {
 	targetType := targettype.ResolveOptional("")
 	var names []string
 	if targetType != "" {
-		actions.SetDeploymentTarget(targetType)
-		defer actions.SetDeploymentTarget("")
+		actions.SetTargetType(targetType)
+		defer actions.SetTargetType("")
 		for _, a := range actions.List() {
 			names = append(names, a.Metadata().Name)
 		}

@@ -28,10 +28,6 @@ zoa_target_type() {
     echo "${ZOA_TARGET_TYPE}"
     return 0
   fi
-  if [[ -n "${ZOA_DEPLOYMENT_TARGET:-}" ]]; then
-    echo "${ZOA_DEPLOYMENT_TARGET}"
-    return 0
-  fi
   echo "mc"
 }
 

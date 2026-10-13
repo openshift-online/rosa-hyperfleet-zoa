@@ -22,8 +22,8 @@ func TestGetDBResource_Metadata_ItShouldBeAReadOnlyAWSAction(t *testing.T) {
 	if meta.Type != "read" {
 		t.Errorf("expected type read, got %q", meta.Type)
 	}
-	if len(meta.DeploymentTargets) != 1 || meta.DeploymentTargets[0] != DeploymentTargetRC {
-		t.Errorf("expected deployment targets [%s], got %v", DeploymentTargetRC, meta.DeploymentTargets)
+	if len(meta.TargetTypes) != 1 || meta.TargetTypes[0] != TargetTypeRC {
+		t.Errorf("expected deployment targets [%s], got %v", TargetTypeRC, meta.TargetTypes)
 	}
 }
 

@@ -8,7 +8,7 @@ import (
 )
 
 func TestMarkdown_WhenTargetTypeRC_ItShouldIncludeRCContext(t *testing.T) {
-	body, err := Markdown(actions.DeploymentTargetRC)
+	body, err := Markdown(actions.TargetTypeRC)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,7 @@ func TestMarkdown_WhenTargetTypeRC_ItShouldIncludeRCContext(t *testing.T) {
 }
 
 func TestList_WhenTargetTypeMC_ItShouldReturnActions(t *testing.T) {
-	items, err := List(actions.DeploymentTargetMC)
+	items, err := List(actions.TargetTypeMC)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestList_WhenTargetTypeMC_ItShouldReturnActions(t *testing.T) {
 }
 
 func TestGet_WhenActionMissing_ItShouldError(t *testing.T) {
-	_, err := Get(actions.DeploymentTargetRC, "not_a_real_action_xyz")
+	_, err := Get(actions.TargetTypeRC, "not_a_real_action_xyz")
 	if err == nil {
 		t.Fatal("expected error")
 	}

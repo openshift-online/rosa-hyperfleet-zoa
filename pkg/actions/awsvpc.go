@@ -28,7 +28,7 @@ func (l *listVPCEndpoints) Metadata() ActionMetadata {
 		ExecutionMode:     "sync",
 		Description:       "List all VPC endpoints in the configured AWS region.",
 		Authorization:     AuthorizationConfig{Approval: "none"},
-		DeploymentTargets: []string{DeploymentTargetRC, DeploymentTargetMC},
+		TargetTypes: []string{TargetTypeRC, TargetTypeMC},
 		TimeoutSeconds:    60,
 		Examples: []string{
 			"zoa run list_vpc_endpoints --reason ROSAENG-1234",
@@ -91,7 +91,7 @@ func (d *describeVPCEndpoint) Metadata() ActionMetadata {
 		ExecutionMode:     "sync",
 		Description:       "Describe a specific VPC endpoint by ID.",
 		Authorization:     AuthorizationConfig{Approval: "none"},
-		DeploymentTargets: []string{DeploymentTargetRC, DeploymentTargetMC},
+		TargetTypes: []string{TargetTypeRC, TargetTypeMC},
 		TimeoutSeconds:    60,
 		Examples: []string{
 			"zoa run describe_vpc_endpoint --name vpce-0123456789abcdef0 --reason ROSAENG-1234",

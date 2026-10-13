@@ -117,7 +117,7 @@ func init() {
 			Type:              "read",
 			ExecutionMode:     "sync",
 			TimeoutSeconds:    60,
-			DeploymentTargets: []string{actions.DeploymentTargetRC, actions.DeploymentTargetMC},
+			TargetTypes: []string{actions.TargetTypeRC, actions.TargetTypeMC},
 			Parameters: []actions.ParameterDef{
 				{Name: "namespace", Required: true},
 			},
@@ -131,7 +131,7 @@ func init() {
 			ExecutionMode:        "sync",
 			TimeoutSeconds:       60,
 			WriteCooldownSeconds: 300,
-			DeploymentTargets:    []string{actions.DeploymentTargetRC, actions.DeploymentTargetMC},
+			TargetTypes:    []string{actions.TargetTypeRC, actions.TargetTypeMC},
 			Parameters: []actions.ParameterDef{
 				{Name: "namespace", Required: true},
 				{Name: "name", Required: true},
@@ -146,7 +146,7 @@ func init() {
 			ExecutionMode:     "sync",
 			TimeoutSeconds:    60,
 			DryRunAction:      "test-read",
-			DeploymentTargets: []string{actions.DeploymentTargetRC, actions.DeploymentTargetMC},
+			TargetTypes: []string{actions.TargetTypeRC, actions.TargetTypeMC},
 			Parameters: []actions.ParameterDef{
 				{Name: "namespace", Required: true},
 				{Name: "name", Required: true},
@@ -623,14 +623,14 @@ func TestHandleCreate_WhenInvalidExecutionMode_ItShouldReturn400(t *testing.T) {
 }
 
 func TestHandleCreate_WhenMustGatherGatherInvalidForDeployment_ItShouldRejectBeforeDispatch(t *testing.T) {
-	actions.SetDeploymentTarget("mc")
-	t.Cleanup(func() { actions.SetDeploymentTarget("") })
+	actions.SetTargetType("mc")
+	t.Cleanup(func() { actions.SetTargetType("") })
 
 	execStore := &mockExecStore{}
 	kubeClient := fake.NewClientset()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	exec := executor.New(kubeClient, &rest.Config{Host: "https://localhost:6443"}, nil, nil, executor.ExecutorConfig{
-		DeploymentTarget: "mc",
+		TargetType: "mc",
 		Region:           "us-east-1",
 	}, logger)
 	cfg := &config.Config{

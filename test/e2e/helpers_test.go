@@ -26,7 +26,7 @@ import (
 // right AWS_PROFILE for the target it's actually talking to.
 type target struct {
 	Name             string // human-readable label for Describe()
-	DeploymentTarget string // "rc" or "mc" — matches ZOA_DEPLOYMENT_TARGET and gather= values
+	TargetType string // "rc" or "mc" — matches ZOA_TARGET_TYPE and gather= values
 	APIURL           string
 	AWSProfile       string
 }
@@ -60,10 +60,10 @@ func envOrDefault(key, def string) string {
 func discoverTargets() []target {
 	var out []target
 	if url := os.Getenv("ZOA_RC_API_URL"); url != "" {
-		out = append(out, target{Name: "RC (Regional Cluster)", DeploymentTarget: "rc", APIURL: url, AWSProfile: envOrDefault("ZOA_RC_AWS_PROFILE", "rrp-rc")})
+		out = append(out, target{Name: "RC (Regional Cluster)", TargetType: "rc", APIURL: url, AWSProfile: envOrDefault("ZOA_RC_AWS_PROFILE", "rrp-rc")})
 	}
 	if url := os.Getenv("ZOA_MC_API_URL"); url != "" {
-		out = append(out, target{Name: "MC (Management Cluster)", DeploymentTarget: "mc", APIURL: url, AWSProfile: envOrDefault("ZOA_MC_AWS_PROFILE", "rrp-mc")})
+		out = append(out, target{Name: "MC (Management Cluster)", TargetType: "mc", APIURL: url, AWSProfile: envOrDefault("ZOA_MC_AWS_PROFILE", "rrp-mc")})
 	}
 	return out
 }
@@ -357,15 +357,15 @@ func caseInsensitiveField(row map[string]interface{}, key string) (string, bool)
 	return "", false
 }
 
-// expectedActionsForDeployment returns TA names that should be registered on a
-// Lambda with ZOA_DEPLOYMENT_TARGET=deploymentTarget, derived from pkg/actions metadata
-// (same DeploymentTargets filtering the server applies at startup).
-func expectedActionsForDeployment(deploymentTarget string) []string {
+// expectedActionsForTargetType returns TA names that should be registered on a
+// Lambda with ZOA_TARGET_TYPE=targetType, derived from pkg/actions metadata
+// (same TargetTypes filtering the server applies at startup).
+func expectedActionsForTargetType(targetType string) []string {
 	var names []string
 	for _, a := range actions.ListCatalog() {
 		meta := a.Metadata()
-		for _, t := range meta.DeploymentTargets {
-			if t == deploymentTarget {
+		for _, t := range meta.TargetTypes {
+			if t == targetType {
 				names = append(names, meta.Name)
 				break
 			}
@@ -375,10 +375,10 @@ func expectedActionsForDeployment(deploymentTarget string) []string {
 	return names
 }
 
-var liveActionSetCache sync.Map // key: deploymentTarget|apiURL → map[string]bool
+var liveActionSetCache sync.Map // key: targetType|apiURL → map[string]bool
 
 func liveActionSet(tgt target) map[string]bool {
-	key := tgt.DeploymentTarget + "|" + tgt.APIURL
+	key := tgt.TargetType + "|" + tgt.APIURL
 	if cached, ok := liveActionSetCache.Load(key); ok {
 		return cached.(map[string]bool)
 	}
@@ -414,19 +414,19 @@ func skipUnlessLiveActions(tgt target, actions ...string) {
 }
 
 // expectLiveActionsInCatalog asserts every name returned by the live Lambda is
-// declared in pkg/actions for this deployment target (allows catalog > image).
+// declared in pkg/actions for this target type (allows catalog > image).
 func expectLiveActionsInCatalog(tgt target, live []string) {
-	catalog := expectedActionsForDeployment(tgt.DeploymentTarget)
+	catalog := expectedActionsForTargetType(tgt.TargetType)
 	for _, name := range live {
 		Expect(catalog).To(ContainElement(name),
-			"live TA %q on %s is not in pkg/actions DeploymentTargets for %q — "+
+			"live TA %q on %s is not in pkg/actions TargetTypes for %q — "+
 				"server may be ahead of the zoa source revision under test",
-			name, tgt.Name, tgt.DeploymentTarget)
+			name, tgt.Name, tgt.TargetType)
 	}
 }
 
 // liveActionNames queries a target's Lambda for registered TA names (already
-// filtered to that endpoint's deployment target).
+// filtered to that endpoint's target type).
 func liveActionNames(tgt target) []string {
 	out, err := runZoa(tgt, "actions", "-o", "json")
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), out)
@@ -515,8 +515,8 @@ func tarballContainsPrefix(tarGzPath, prefix string) (bool, error) {
 
 // mustGatherPlatformNamespace returns a namespace path marker inside the must_gather
 // tarball that is unique to MC vs RC platform dumps.
-func mustGatherPlatformNamespace(deploymentTarget string) string {
-	switch deploymentTarget {
+func mustGatherPlatformNamespace(targetType string) string {
+	switch targetType {
 	case "mc":
 		return "mc/namespaces/kube-applier/"
 	case "rc":
@@ -528,8 +528,8 @@ func mustGatherPlatformNamespace(deploymentTarget string) string {
 
 // mustGatherOppositePlatformPrefix returns the top-level gather dir for the other
 // deployment (should be absent when gather matches this endpoint only).
-func mustGatherOppositePlatformPrefix(deploymentTarget string) string {
-	switch deploymentTarget {
+func mustGatherOppositePlatformPrefix(targetType string) string {
+	switch targetType {
 	case "mc":
 		return "rc/"
 	case "rc":

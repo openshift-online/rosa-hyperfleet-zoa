@@ -18,7 +18,7 @@ type Config struct {
 	AuditTable             string
 	ArtifactBucket         string
 	TargetCluster          string
-	DeploymentTarget       string
+	TargetType             string
 	Region                 string
 	JobImage               string
 	WriteCooldownSeconds   int
@@ -129,7 +129,7 @@ func Load() (*Config, error) {
 		AuditTable:                     getEnv("AUDIT_TABLE", ""),
 		ArtifactBucket:                 getEnv("ARTIFACT_BUCKET", ""),
 		TargetCluster:                  getEnv("TARGET_CLUSTER", ""),
-		DeploymentTarget:               targetTypeFromEnv(),
+		TargetType:                     targetTypeFromEnv(),
 		Region:                         getEnv("AWS_REGION", "us-east-1"),
 		JobImage:                       getEnv("JOB_IMAGE", ""),
 		WriteCooldownSeconds:           getEnvInt("WRITE_COOLDOWN_SECONDS", 300),
@@ -206,11 +206,11 @@ func Load() (*Config, error) {
 	if cfg.EKSClusterName == "" {
 		return nil, fmt.Errorf("EKS_CLUSTER_NAME is required (used for EKS token generation)")
 	}
-	if cfg.DeploymentTarget == "" {
-		return nil, fmt.Errorf("%s is required (rc or mc)", targetTypeEnvPrimary)
+	if cfg.TargetType == "" {
+		return nil, fmt.Errorf("%s is required (rc or mc)", targetTypeEnv)
 	}
-	if cfg.DeploymentTarget != "rc" && cfg.DeploymentTarget != "mc" {
-		return nil, fmt.Errorf("invalid %s %q: must be rc or mc", targetTypeEnvPrimary, cfg.DeploymentTarget)
+	if cfg.TargetType != "rc" && cfg.TargetType != "mc" {
+		return nil, fmt.Errorf("invalid %s %q: must be rc or mc", targetTypeEnv, cfg.TargetType)
 	}
 
 	if cfg.HandlerMode == "api" {
@@ -277,21 +277,15 @@ func getEnvInt(key string, fallback int) int {
 	return i
 }
 
-const (
-	targetTypeEnvPrimary = "ZOA_TARGET_TYPE"
-	targetTypeEnvLegacy  = "ZOA_DEPLOYMENT_TARGET"
-)
+const targetTypeEnv = "ZOA_TARGET_TYPE"
 
 func targetTypeFromEnv() string {
 	return TargetTypeFromEnv()
 }
 
-// TargetTypeFromEnv reads ZOA_TARGET_TYPE, then legacy ZOA_DEPLOYMENT_TARGET.
+// TargetTypeFromEnv reads ZOA_TARGET_TYPE (rc or mc).
 func TargetTypeFromEnv() string {
-	if v := normalizeTargetType(os.Getenv(targetTypeEnvPrimary)); v != "" {
-		return v
-	}
-	return normalizeTargetType(os.Getenv(targetTypeEnvLegacy))
+	return normalizeTargetType(os.Getenv(targetTypeEnv))
 }
 
 func normalizeTargetType(s string) string {

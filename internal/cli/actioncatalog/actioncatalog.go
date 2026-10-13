@@ -16,8 +16,8 @@ const OfflineNotice = "Offline catalog: embedded in this zoa CLI build (filtered
 
 // List returns API-shaped action metadata for the given target type (rc or mc).
 func List(targetType string) ([]client.Action, error) {
-	actions.SetDeploymentTarget(targetType)
-	defer actions.SetDeploymentTarget("")
+	actions.SetTargetType(targetType)
+	defer actions.SetTargetType("")
 
 	registered := actions.List()
 	out := make([]client.Action, 0, len(registered))
@@ -29,8 +29,8 @@ func List(targetType string) ([]client.Action, error) {
 
 // Get returns one action from the embedded registry for targetType, or an error if unknown/hidden.
 func Get(targetType, name string) (*client.Action, error) {
-	actions.SetDeploymentTarget(targetType)
-	defer actions.SetDeploymentTarget("")
+	actions.SetTargetType(targetType)
+	defer actions.SetTargetType("")
 
 	a, ok := actions.Get(name)
 	if !ok {
@@ -42,8 +42,8 @@ func Get(targetType, name string) (*client.Action, error) {
 
 // Markdown renders the boundary / Claude catalog document for targetType.
 func Markdown(targetType string) (string, error) {
-	actions.SetDeploymentTarget(targetType)
-	defer actions.SetDeploymentTarget("")
+	actions.SetTargetType(targetType)
+	defer actions.SetTargetType("")
 
 	var b strings.Builder
 	b.WriteString("# ZOA Trusted Actions catalog\n\n")
@@ -64,7 +64,7 @@ func Markdown(targetType string) (string, error) {
 
 	for _, a := range list {
 		meta := a.Metadata()
-		targets := strings.Join(meta.DeploymentTargets, ", ")
+		targets := strings.Join(meta.TargetTypes, ", ")
 		fmt.Fprintf(&b, "## %s\n\n", meta.Name)
 		fmt.Fprintf(&b, "- **Scope:** %s · **Type:** %s · **Mode:** %s\n", meta.Scope, meta.Type, meta.ExecutionMode)
 		fmt.Fprintf(&b, "- **Also on:** %s\n", targets)
@@ -122,12 +122,12 @@ func writeEnvironmentContext(b *strings.Builder, targetType string) {
 	b.WriteString("## Environment context (HyperFleet)\n\n")
 	b.WriteString("ROSA HyperFleet runs **Amazon EKS** for platform clusters. ")
 	switch targetType {
-	case actions.DeploymentTargetRC:
+	case actions.TargetTypeRC:
 		b.WriteString("This catalog is for a **Regional Cluster (RC)** boundary: one RC per region per deployment, running regional services (Platform API, hyperfleet-operator, GitOps, observability).\n\n")
 		b.WriteString("**Discovery example** (find where a component runs):\n\n")
 		b.WriteString("```bash\nzoa run get_resource --resource namespaces --reason TICKET\nzoa run get_resource --resource pods -n platform-api --reason TICKET\n```\n\n")
 		b.WriteString("**Namespaces often relevant on RC (hints only):** `platform-api`, `hyperfleet`, `argocd`, `thanos`, `grafana`, `loki`, `monitoring`, `vector`, `cert-manager`.\n\n")
-	case actions.DeploymentTargetMC:
+	case actions.TargetTypeMC:
 		b.WriteString("This catalog is for a **Management Cluster (MC)** boundary: a region may have **multiple MCs**; this session is attached to **one** MC EKS cluster running HyperShift and hosted control planes.\n\n")
 		b.WriteString("**Discovery example:**\n\n")
 		b.WriteString("```bash\nzoa run get_resource --resource namespaces --reason TICKET\nzoa run get_resource --resource pods -n hypershift --reason TICKET\n```\n\n")

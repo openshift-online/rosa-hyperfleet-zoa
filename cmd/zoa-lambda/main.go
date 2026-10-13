@@ -48,9 +48,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	actions.SetDeploymentTarget(cfg.DeploymentTarget)
+	actions.SetTargetType(cfg.TargetType)
 
-	logger = logger.With("target", cfg.TargetCluster, "deployment_target", cfg.DeploymentTarget, "region", cfg.Region)
+	logger = logger.With("target", cfg.TargetCluster, "target_type", cfg.TargetType, "region", cfg.Region)
 	logger.Info("starting zoa-lambda",
 		"handler_mode", cfg.HandlerMode,
 		"reconciler_deadline_s", cfg.ReconcilerDeadlineSeconds,
@@ -165,7 +165,7 @@ func main() {
 		KMSKeyARN:        cfg.KMSKeyARN,
 		Region:           cfg.Region,
 		JobImage:         cfg.JobImage,
-		DeploymentTarget: cfg.DeploymentTarget,
+		TargetType: cfg.TargetType,
 		TargetCluster:    cfg.TargetCluster,
 	}, logger)
 

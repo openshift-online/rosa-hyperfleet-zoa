@@ -136,7 +136,6 @@ func TestLoad_WhenAccessModeDoesNotRequireEKS_ItShouldSucceed(t *testing.T) {
 	t.Setenv("EXECUTION_TABLE", "")
 	t.Setenv("ARTIFACT_BUCKET", "")
 	t.Setenv("ZOA_TARGET_TYPE", "")
-	t.Setenv("ZOA_DEPLOYMENT_TARGET", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -252,10 +251,9 @@ func TestLoad_WhenWorkerMissingJobImage_ItShouldReturnError(t *testing.T) {
 	}
 }
 
-func TestLoad_WhenMissingDeploymentTarget_ItShouldReturnError(t *testing.T) {
+func TestLoad_WhenMissingTargetType_ItShouldReturnError(t *testing.T) {
 	setRequiredEnv(t)
 	t.Setenv("ZOA_TARGET_TYPE", "")
-	t.Setenv("ZOA_DEPLOYMENT_TARGET", "")
 
 	_, err := Load()
 	if err == nil {
@@ -263,21 +261,7 @@ func TestLoad_WhenMissingDeploymentTarget_ItShouldReturnError(t *testing.T) {
 	}
 }
 
-func TestLoad_WhenLegacyDeploymentTargetEnv_ItShouldAccept(t *testing.T) {
-	setRequiredEnv(t)
-	t.Setenv("ZOA_TARGET_TYPE", "")
-	t.Setenv("ZOA_DEPLOYMENT_TARGET", "rc")
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.DeploymentTarget != "rc" {
-		t.Fatalf("got %q, want rc", cfg.DeploymentTarget)
-	}
-}
-
-func TestLoad_WhenInvalidDeploymentTarget_ItShouldReturnError(t *testing.T) {
+func TestLoad_WhenInvalidTargetType_ItShouldReturnError(t *testing.T) {
 	setRequiredEnv(t)
 	t.Setenv("ZOA_TARGET_TYPE", "hcp")
 

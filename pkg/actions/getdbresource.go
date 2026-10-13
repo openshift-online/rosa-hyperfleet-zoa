@@ -45,8 +45,13 @@ func (a *getDBResource) Metadata() ActionMetadata {
 		Description:   "Get or list HyperFleet control-plane resources directly from the hyperfleet-db (Aurora PostgreSQL) by GVK, namespace, and name.",
 		Authorization: AuthorizationConfig{Approval: "none"},
 		// RC only: hyperfleet-db lives in the regional cluster VPC.
-		DeploymentTargets: []string{DeploymentTargetRC},
-		TimeoutSeconds:    30,
+		TargetTypes:    []string{TargetTypeRC},
+		TimeoutSeconds: 30,
+		Examples: []string{
+			"zoa run list_db_gvks --reason ROSAENG-1234",
+			"zoa run get_db_resource --reason ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1/Cluster -A",
+			"zoa run get_db_resource --reason ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1/Cluster -n cluster-38ae9f84-aa1f-48bd-89e8-2d4611404fa1 --name my-cluster",
+		},
 		Parameters: []ParameterDef{
 			{Name: "gvk", Required: true, Description: "Group/Version/Kind, e.g. hyperfleet.io/v1alpha1/Cluster (core group: /v1/ConfigMap). Run list_db_gvks to discover valid values."},
 			{Name: "namespace", Description: "Target namespace (omit with all_namespaces, or for cluster-scoped resources)"},

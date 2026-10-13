@@ -142,12 +142,12 @@ func TestAllRegisteredActions_Conformance(t *testing.T) {
 
 			// --- Deployment target declaration ---
 
-			if len(meta.DeploymentTargets) == 0 {
-				t.Error("DeploymentTargets must declare at least rc and/or mc")
+			if len(meta.TargetTypes) == 0 {
+				t.Error("TargetTypes must declare at least rc and/or mc")
 			}
-			for _, target := range meta.DeploymentTargets {
-				if target != DeploymentTargetRC && target != DeploymentTargetMC {
-					t.Errorf("DeploymentTargets entry must be rc or mc, got %q", target)
+			for _, target := range meta.TargetTypes {
+				if target != TargetTypeRC && target != TargetTypeMC {
+					t.Errorf("TargetTypes entry must be rc or mc, got %q", target)
 				}
 			}
 

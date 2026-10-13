@@ -14,7 +14,7 @@ import (
 
 func TestListActionsOffline_WhenTargetTypeRC_ItShouldWriteMarkdownWithoutAPI(t *testing.T) {
 	global := &GlobalOptions{OutputFormat: output.FormatMarkdown}
-	opts := &catalogOptions{offline: true, targetType: actions.DeploymentTargetRC}
+	opts := &catalogOptions{offline: true, targetType: actions.TargetTypeRC}
 
 	stdout := captureStdout(t, func() {
 		if err := listActionsOffline(global, opts); err != nil {
