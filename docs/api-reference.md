@@ -6,7 +6,7 @@ The ZOA API is exposed via an AWS Lambda Function URL with IAM authentication (S
 
 All requests must be signed with AWS SigV4. The Lambda Function URL uses `authorization_type = "AWS_IAM"`. The **`zoa` CLI** sets **`X-Operator`** to `sts:GetCallerIdentity().Arn` for the credentials that signed the request.
 
-On the **API** Lambda, boundary callers use the **ECS task role**; the server resolves the human **operator** and **session id** via the **identity bridge** (task id in the ARN → DynamoDB session lookup). On **Access**, the operator is taken from the **invoker** ARN for session ownership. See [Boundary SRE access guide — Identity and SigV4](boundary/sre-access-guide.md#identity-and-sigv4).
+On the **API** Lambda, boundary callers use the **ECS task role**; the server resolves the human **operator** and **session id** via the **identity bridge** (task id in the ARN → DynamoDB session lookup). On **Access**, the operator is taken from the **invoker** ARN for session ownership. See [Operator workflow — Identity and SigV4](guides/operator-workflow.md#identity-and-sigv4).
 
 ## Base URL
 

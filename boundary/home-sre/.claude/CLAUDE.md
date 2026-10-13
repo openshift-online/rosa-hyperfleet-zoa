@@ -218,7 +218,7 @@ You do **not** need `zoa deployments`, `zoa targets`, or `zoa session *` here �
 
 Use **`-o json`** and **`jq`** for scripting.
 
-### Suggesting a TA during investigation
+### Suggesting a TA during a session
 
 1. Read **`ZOA_ACTIONS.md`** (baked catalog for **`rc` or `mc`** — no need to run `zoa actions` for the list if the file is present).
 2. Match the problem to **scope** and **type**: e.g. need a Secret in a non-HCP namespace → **`get_secret`** (read); need pod list → **`get_resource`** with `--resource pods`; AWS networking → **`list_vpc_endpoints`** / **`describe_vpc_endpoint`**.

@@ -2,13 +2,18 @@
 
 ## Role
 
-ZOA Boundary is an **ephemeral jump box** in the **same VPC** as the target EKS cluster. It provides:
+ZOA Boundary is an **ephemeral jump server** in the **same VPC** as the target EKS cluster, with purpose-built tooling (`zoa` CLI, `kubectl`, `aws` CLI v2, Claude Code, `jq`). Everything that happens inside is audited via CloudWatch logs (container stdout + ECS Exec transcripts, FedRAMP AU-09). It provides:
 
 - Network path to the **private EKS API** (for TAs and future break-glass).
-- **ECS Exec** session recording (FedRAMP AU-09).
 - **`zoa` CLI** wired to the **per-VPC API Lambda** (`ZOA_API_URL`).
 
-It is **not** a persistent workstation (no EFS). TA artifacts live in **S3** via the ZOA API; the container disk is discarded when the task stops.
+The design is deliberately stateless:
+
+1. **Ephemeral by design.** Sessions are disposable containers with no persistent state. TA outputs live in **S3** (DynamoDB-indexed); session metadata lives in **DynamoDB**. Nothing survives the task stop — the container disk is discarded. This eliminates lifecycle management (orphaned storage, stale state, cleanup failures) and simplifies the operator experience to `session start` → work → `session stop`.
+2. **Shareable by ID.** Every TA execution produces an ID that any authorized operator can use to retrieve output (`zoa output <id>`), inspect metadata (`zoa get <id>`), or audit the full history (`zoa runs`). DynamoDB records who ran what, against which target, with which parameters — no need to share a session or a filesystem. This also enables third-party integrations: an automation (PagerDuty, EventBridge) can execute TAs and pass execution IDs to the paged SRE, who picks up pre-gathered diagnostics from S3 without re-running anything.
+3. **Single CLI.** `zoa` is the only SRE CLI — sessions, TAs, break-glass (future), discovery, audit. No separate tooling to maintain.
+4. **Pipeline integration.** Boundary image builds, ECS task definitions, SSM target registration, and boundary IAM all live in the same Terraform modules as the Lambda TA plane (`modules/zoa-lambda`). A single `terraform apply` deploys both — no parallel stack per region.
+5. **Reason-scoped.** Access is scoped around a **reason** (Jira/PD ticket) that is a field on each session — the session IS the task, 1:1. An SRE might open 3 sessions across 2 days for the same reason; the reason links them, not a container lifecycle.
 
 ## Control plane split
 
@@ -29,7 +34,7 @@ A compromised **invoker** role can manage sessions but cannot replace the bounda
 
 Three separate credential layers: **invoker + SigV4** to Access on the laptop, **vended Exec credentials** scoped to one ECS task on join, **ECS task role + SigV4** to the API inside the container. Session **ownership** and TA **operator** attribution are enforced server-side (DynamoDB session rows + **identity bridge**: ECS task id → session → human operator). Env vars such as `ZOA_OPERATOR` are for the shell UX only.
 
-**Authoritative walkthrough for SREs and reviewers:** [SRE access guide — Identity and SigV4](sre-access-guide.md#identity-and-sigv4).
+**Authoritative walkthrough for SREs and reviewers:** [Operator workflow — Identity and SigV4](../guides/operator-workflow.md#identity-and-sigv4).
 
 ## Session lifecycle
 
@@ -48,7 +53,7 @@ Two SSM layouts, one **Central account** store:
 | Path                                     | Written by                                           | Read by                        | Purpose                                                    |
 | ---------------------------------------- | ---------------------------------------------------- | ------------------------------ | ---------------------------------------------------------- |
 | `/zoa/deployments/<deployment_name>`     | RC Terraform (central provider)                      | **Laptop** (`zoa deployments`) | Access Function URL + invoker role ARN                     |
-| `/zoa/targets/<deployment>/<cluster_id>` | RC Terraform per target (RC or cross-account for MC) | **Access Lambda**              | ECS cluster, subnets, task definition, **per-VPC API URL** |
+| `/zoa/targets/<deployment>/<cluster_id>` | `zoa-lambda` module per target (RC writes locally; MC writes cross-account via `zoa-data-access` role) | **Access Lambda** | ECS cluster, subnets, task definition, **per-VPC API URL** |
 
 **Why SSM for both?** Single discovery mechanism for “where is this environment?” without a custom registry DB. Deployments answer “how do I reach Access?”; targets answer “where do I run the boundary task and what `ZOA_API_URL` do I inject?”
 

@@ -68,4 +68,4 @@ Entrypoint copies `/usr/share/zoa/catalog/ZOA_ACTIONS.{rc|mc}.md` → `/home/sre
 - **SSM history pagination** is capped (20 pages); sufficient for dev/ephemeral; revisit at high join churn.
 - Roll back feature bundle: git parent before `feat(boundary): idle reaper, exec session tracking, and CLI/catalog UX` on `feat/zoa-boundary`.
 
-See also [boundary session logging](boundary-session-logging.md), [SRE access guide](../boundary/sre-access-guide.md), [boundary architecture](../boundary/architecture.md).
+See also [boundary session logging](boundary-session-logging.md), [operator workflow](../guides/operator-workflow.md), [boundary architecture](../boundary/architecture.md).

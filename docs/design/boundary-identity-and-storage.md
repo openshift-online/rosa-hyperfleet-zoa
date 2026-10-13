@@ -2,7 +2,7 @@
 
 This document is the **agreed implementation plan** for uniform operator attribution across **sessions**, **runs (executions)**, and **audit**; DynamoDB index policy for `boundary-sessions`; and CLI output contracts. Keep it in sync with code comments at the cited entry points.
 
-**Related:** [boundary-session-reaper.md](./boundary-session-reaper.md), [boundary-session-logging.md](./boundary-session-logging.md), [sre-access-guide.md](../boundary/sre-access-guide.md).
+**Related:** [boundary-session-reaper.md](./boundary-session-reaper.md), [boundary-session-logging.md](./boundary-session-logging.md), [operator-workflow.md](../guides/operator-workflow.md).
 
 ---
 

@@ -1051,7 +1051,7 @@ Wire into CI: `openshift/release` Prow job configuration for boundary e2e (may n
 
 **Scope**:
 
-- Update `docs/boundary/architecture.md`, `docs/boundary/sre-access-guide.md`, `docs/cli-reference.md` (rosa-hyperfleet-zoa)
+- Update `docs/boundary/architecture.md`, `docs/guides/operator-workflow.md`, `docs/cli-reference.md` (rosa-hyperfleet-zoa)
 - Update `docs/design/zoa-architecture.md` (rosa-hyperfleet) where boundary is still marked future
 - New or extend `docs/sop/boundary-troubleshooting.md` (rosa-hyperfleet): stuck sessions, reaper, SSM, exec-attached
 
@@ -1096,7 +1096,7 @@ Then update HyperFleet config so **`zoa-access` invoker trust** allows that role
 - app-interface: new or extended IAM role(s) in each Central Account used by HyperFleet dev / int / stage (exact account aliases TBD with platform — follow osd-staging-2 pattern)
 - SAML role permissions: **`sts:AssumeRole`** on `arn:aws:iam::*:role/*-zoa-access-invoker` (narrow to known RC account IDs per env); **`ssm:GetParameter`** on `/zoa/deployments` (and any paths required for `zoa deployments`); deny broad RC/MC admin where policy allows scoping
 - `rosa-hyperfleet`: override `aws.zoa_access_trusted_assumer_role_names` in `config/dev/`, `config/integration/`, `config/stage/` (not global default); run `uv run scripts/render.py`; Terraform apply per region
-- Docs: `docs/boundary/sre-access-guide.md` — prerequisite block (kinit, SAML profile, verify with `aws sts get-caller-identity` before `zoa deployments`)
+- Docs: `docs/guides/operator-workflow.md` — prerequisite block (kinit, SAML profile, verify with `aws sts get-caller-identity` before `zoa deployments`)
 
 **Acceptance Criteria**:
 
