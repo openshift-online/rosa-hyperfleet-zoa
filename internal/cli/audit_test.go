@@ -195,7 +195,7 @@ func TestFormatAuditPathForTable_WhenV0Paths_ItShouldStripPrefixOnly(t *testing.
 		in, want string
 	}{
 		{"/api/v0/trusted-actions/list_eks_clusters/run", "trusted-actions/list_eks_clusters/run"},
-		{"/api/v0/trusted-actions/audit", "trusted-actions/audit"},
+		{"/api/v0/audit", "audit"},
 		{"/api/v0/sessions/start", "sessions/start"},
 		{"/api/v0/sessions/join/abc", "sessions/join/abc"},
 		{"/health", "/health"},

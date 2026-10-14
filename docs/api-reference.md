@@ -277,11 +277,13 @@ Served by the API Lambda (`HANDLER_MODE=api`) in each target VPC.
 | `GET` | `/api/v0/trusted-actions/runs/{id}/output` | Download execution output (streaming) |
 | `GET` | `/api/v0/trusted-actions/runs/{id}/logs` | Download execution logs (streaming) |
 
-### Audit
+### Audit (platform)
+
+Fleet-wide audit log (TA runs, session operations, and this query itself). Not under `/trusted-actions/`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/v0/trusted-actions/audit` | Query audit trail |
+| `GET` | `/api/v0/audit` | Query audit trail |
 
 ---
 
@@ -423,9 +425,9 @@ Used by `zoa logs <id>`.
 
 ---
 
-## GET /api/v0/trusted-actions/audit
+## GET /api/v0/audit
 
-Query the audit trail. Records both TA executions and session operations (from Access Lambda).
+Query the audit trail. Records TA executions (API Lambda), session operations (Access Lambda), and read access to this endpoint.
 
 ### Query Parameters
 

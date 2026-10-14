@@ -5,9 +5,13 @@ const V0Prefix = "/api/v0"
 
 // Trusted Action routes (HANDLER_MODE=api).
 const (
-	PathTrustedActions      = V0Prefix + "/trusted-actions"
-	PathTrustedActionsAudit = V0Prefix + "/trusted-actions/audit"
-	PathTrustedActionsRuns  = V0Prefix + "/trusted-actions/runs"
+	PathTrustedActions     = V0Prefix + "/trusted-actions"
+	PathTrustedActionsRuns = V0Prefix + "/trusted-actions/runs"
+)
+
+// Platform routes (HANDLER_MODE=api) — cross-cutting; not under /trusted-actions.
+const (
+	PathAudit = V0Prefix + "/audit"
 )
 
 // Access / boundary routes (HANDLER_MODE=access). Same v0 prefix and error envelope as TA routes.

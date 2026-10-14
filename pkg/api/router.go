@@ -123,7 +123,7 @@ func (h *Handler) registerRoutes() {
 	h.mux.HandleFunc("GET "+PathTrustedActions, h.handleListActions)
 
 	// Audit
-	h.mux.HandleFunc("GET "+PathTrustedActionsAudit, h.handleAudit)
+	h.mux.HandleFunc("GET "+PathAudit, h.handleAudit)
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

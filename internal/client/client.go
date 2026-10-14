@@ -140,7 +140,7 @@ func (c *Client) ListActions(ctx context.Context) (*ActionList, error) {
 }
 
 func (c *Client) ListAudit(ctx context.Context, query url.Values) (*AuditList, error) {
-	path := "/trusted-actions/audit"
+	path := "/audit"
 	if len(query) > 0 {
 		path += "?" + query.Encode()
 	}

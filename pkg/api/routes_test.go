@@ -136,7 +136,7 @@ func TestHandleAudit_WhenEntriesExist_ItShouldReturnThem(t *testing.T) {
 	}
 	h := testHandlerWithAudit(&mockExecStore{}, auditStore)
 
-	rr := doRequest(h, "GET", "/api/v0/trusted-actions/audit", nil, defaultHeaders())
+	rr := doRequest(h, "GET", "/api/v0/audit", nil, defaultHeaders())
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
@@ -153,7 +153,7 @@ func TestHandleAudit_WhenEntriesExist_ItShouldReturnThem(t *testing.T) {
 func TestHandleAudit_WhenNoAccountID_ItShouldStillReturn200(t *testing.T) {
 	h := testHandlerWithAudit(&mockExecStore{}, &mockAuditStoreWithData{})
 
-	rr := doRequest(h, "GET", "/api/v0/trusted-actions/audit", nil, map[string]string{})
+	rr := doRequest(h, "GET", "/api/v0/audit", nil, map[string]string{})
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
@@ -319,7 +319,7 @@ func TestHandleAudit_WhenTargetProvided_ItShouldPassTargetFilter(t *testing.T) {
 	auditStore := &filterCapturingAuditStore{}
 	h := testHandlerWithAudit(&mockExecStore{}, auditStore)
 
-	rr := doRequest(h, "GET", "/api/v0/trusted-actions/audit?target=eph-dev-rc", nil, defaultHeaders())
+	rr := doRequest(h, "GET", "/api/v0/audit?target=eph-dev-rc", nil, defaultHeaders())
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
@@ -349,7 +349,7 @@ func TestHandleAudit_WhenFiltersProvided_ItShouldPassFilterToStore(t *testing.T)
 	auditStore := &filterCapturingAuditStore{}
 	h := testHandlerWithAudit(&mockExecStore{}, auditStore)
 
-	rr := doRequest(h, "GET", "/api/v0/trusted-actions/audit?method=POST&since=24h&limit=15", nil, defaultHeaders())
+	rr := doRequest(h, "GET", "/api/v0/audit?method=POST&since=24h&limit=15", nil, defaultHeaders())
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
@@ -374,7 +374,7 @@ func TestHandleAudit_WhenLimitExceeds200_ItShouldCap(t *testing.T) {
 	auditStore := &filterCapturingAuditStore{}
 	h := testHandlerWithAudit(&mockExecStore{}, auditStore)
 
-	doRequest(h, "GET", "/api/v0/trusted-actions/audit?limit=999", nil, defaultHeaders())
+	doRequest(h, "GET", "/api/v0/audit?limit=999", nil, defaultHeaders())
 
 	if auditStore.capturedFilter == nil {
 		t.Fatal("expected filter to be set")
@@ -452,7 +452,7 @@ func TestHandleAudit_WhenCalled_ItShouldRecordAudit(t *testing.T) {
 	auditStore := &auditCapturingStore{}
 	h := testHandlerWithAudit(&mockExecStore{}, auditStore)
 
-	rr := doRequest(h, "GET", "/api/v0/trusted-actions/audit", nil, defaultHeaders())
+	rr := doRequest(h, "GET", "/api/v0/audit", nil, defaultHeaders())
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())

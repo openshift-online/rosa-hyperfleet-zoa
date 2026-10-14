@@ -290,7 +290,7 @@ func TestClientListActions(t *testing.T) {
 func TestClientListAudit(t *testing.T) {
 	t.Run("When query params provided it should pass them", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path != "/api/v0/trusted-actions/audit" {
+			if r.URL.Path != "/api/v0/audit" {
 				t.Errorf("unexpected path: %s", r.URL.Path)
 			}
 			if r.URL.Query().Get("since") != "24h" {

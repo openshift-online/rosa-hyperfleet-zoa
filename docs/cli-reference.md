@@ -502,6 +502,8 @@ All filters are combinable:
 | `--until` | | Show entries before this point. See [Time Formats](#time-formats). |
 | `--limit` | | Max results (max 200, default 50) |
 
+Calls `GET /api/v0/audit` on the per-VPC API Lambda (platform route, not under `/trusted-actions/`). Default table **PATH** omits `/api/v0/` and shows the route family (`trusted-actions/...`, `sessions/...`, `audit`); `-o json` includes the full stored path.
+
 ### `download`
 
 | Flag | Short | Description |
