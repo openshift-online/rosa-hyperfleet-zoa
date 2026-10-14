@@ -164,7 +164,7 @@ func (h *Handler) handleOutputRoute(w http.ResponseWriter, r *http.Request) {
 	if ok {
 		statusCode = rw.statusCode
 	}
-	h.recordAudit(r, statusCode, "", id)
+	h.recordAudit(r, statusCode, AuditActionRunOutput, id)
 }
 
 func (h *Handler) handleLogsRoute(w http.ResponseWriter, r *http.Request) {
@@ -175,7 +175,7 @@ func (h *Handler) handleLogsRoute(w http.ResponseWriter, r *http.Request) {
 	if ok {
 		statusCode = rw.statusCode
 	}
-	h.recordAudit(r, statusCode, "", id)
+	h.recordAudit(r, statusCode, AuditActionRunLogs, id)
 }
 
 func (h *Handler) handleDescribeActionRoute(w http.ResponseWriter, r *http.Request) {
@@ -198,7 +198,7 @@ func (h *Handler) handleGetExecution(w http.ResponseWriter, r *http.Request, id 
 		return
 	}
 
-	h.recordAudit(r, http.StatusOK, "", id)
+	h.recordAudit(r, http.StatusOK, AuditActionRunGet, id)
 
 	type enrichedExecution struct {
 		*store.Execution
@@ -302,7 +302,7 @@ func (h *Handler) handleListExecutions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.recordAudit(r, http.StatusOK, "", "")
+	h.recordAudit(r, http.StatusOK, AuditActionRunsList, "")
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{"items": executions, "count": len(executions), "next_token": nil})
 }
@@ -377,7 +377,7 @@ func (h *Handler) handleAudit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.recordAudit(r, http.StatusOK, "", "")
+	h.recordAudit(r, http.StatusOK, AuditActionQuery, "")
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{"items": entries, "count": len(entries)})
 }

@@ -280,9 +280,12 @@ zoa download <exec-id> -f /tmp/output.json
 zoa runs -o json
 zoa get <exec-id> -o json
 
-# Audit
+# Audit (unified trail: TA runs, session_*, and API meta reads)
 zoa audit --limit 20
 zoa audit --since 7d --target my-cluster
+zoa audit --action get_db_resource
+zoa audit --action runs_list
+zoa audit --action audit_query
 zoa audit --since 2026-08-01 --until 2026-08-15
 ```
 
@@ -505,7 +508,9 @@ All filters are combinable:
 | `--until`    |       | Show entries before this point. See [Time Formats](#time-formats).                 |
 | `--limit`    |       | Max results (max 200, default 50)                                                  |
 
-Default table **PATH** omits `/api/v0/` and shows the route family (`trusted-actions/...`, `sessions/...`, `audit`); `-o json` includes the full stored path.
+**ACTION column:** Trusted Action runs use the **TA name** (`get_db_resource`, …). Session lifecycle uses **`session_*`** (`session_start`, `session_join`, `session_history`, …). Boundary **meta** API reads use reserved names: `runs_list` (`zoa runs`), `run_get` (`zoa get`), `run_output` / `run_logs` (artifacts), `audit_query` (`zoa audit`). Catalog reads (`zoa actions`, `zoa describe`, laptop `zoa targets`, `zoa session list` with `scope=mine`) are **not** audited (no row).
+
+Default table **PATH** omits `/api/v0/` and shows the route family (`trusted-actions/...`, `sessions/...`, `audit`); `-o json` includes the full stored path. See [API reference — audit action values](api-reference.md#audit-action-values).
 
 ### `download`
 

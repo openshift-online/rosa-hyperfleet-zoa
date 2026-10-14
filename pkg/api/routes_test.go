@@ -426,6 +426,9 @@ func TestHandleGetExecution_WhenFound_ItShouldRecordAudit(t *testing.T) {
 	if entry.ExecutionID != "exec-123" {
 		t.Errorf("expected execution_id=exec-123, got %s", entry.ExecutionID)
 	}
+	if entry.Action != AuditActionRunGet {
+		t.Errorf("expected action=%s, got %s", AuditActionRunGet, entry.Action)
+	}
 	if entry.StatusCode != http.StatusOK {
 		t.Errorf("expected status_code=200, got %d", entry.StatusCode)
 	}
@@ -446,6 +449,9 @@ func TestHandleListExecutions_WhenCalled_ItShouldRecordAudit(t *testing.T) {
 	if auditStore.recorded[0].Method != "GET" {
 		t.Errorf("expected method=GET, got %s", auditStore.recorded[0].Method)
 	}
+	if auditStore.recorded[0].Action != AuditActionRunsList {
+		t.Errorf("expected action=%s, got %s", AuditActionRunsList, auditStore.recorded[0].Action)
+	}
 }
 
 func TestHandleAudit_WhenCalled_ItShouldRecordAudit(t *testing.T) {
@@ -465,6 +471,9 @@ func TestHandleAudit_WhenCalled_ItShouldRecordAudit(t *testing.T) {
 	}
 	if auditStore.recorded[0].Path != "/api/v0/audit" {
 		t.Errorf("expected recorded path /api/v0/audit, got %q", auditStore.recorded[0].Path)
+	}
+	if auditStore.recorded[0].Action != AuditActionQuery {
+		t.Errorf("expected action=%s, got %s", AuditActionQuery, auditStore.recorded[0].Action)
 	}
 }
 

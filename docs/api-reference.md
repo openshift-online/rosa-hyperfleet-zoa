@@ -66,6 +66,8 @@ Served by the Access Lambda (`HANDLER_MODE=access`) in the RC account (no VPC at
 | ------ | ----------------- | ----------------------------------------- |
 | `GET`  | `/api/v0/targets` | List targets (RC + MC) for the deployment |
 
+`GET /targets` is not written to the audit trail (read-only discovery, same class as `zoa actions` / `zoa describe` on the API Lambda).
+
 ### Sessions
 
 | Method | Path                                  | Description                                                                                 |
@@ -287,15 +289,41 @@ Served by the API Lambda (`HANDLER_MODE=api`) in each target VPC.
 
 ## GET /api/v0/audit
 
-Query the audit trail. Records TA executions (API Lambda), session operations (Access Lambda), and read access to this endpoint.
+Query the audit trail. The store holds TA executions (API Lambda), session operations (Access Lambda), and **meta** API reads (listing runs, fetching artifacts, querying this endpoint). Each successful meta read appends one row (for example `audit_query` when you call this endpoint).
 
 ### Query Parameters
 
-| Param      | Type   | Description                                                       |
-| ---------- | ------ | ----------------------------------------------------------------- |
-| `action`   | string | Filter by action (TA name or session action like `session_start`) |
-| `operator` | string | Filter by operator                                                |
-| `limit`    | int    | Max results (default 50)                                          |
+| Param      | Type   | Description                                                                                          |
+| ---------- | ------ | ---------------------------------------------------------------------------------------------------- |
+| `action`   | string | Filter by `action` field — TA name, `session_*`, or API meta actions (`audit_query`, `runs_list`, …) |
+| `operator` | string | Filter by operator                                                                                   |
+| `limit`    | int    | Max results (default 50)                                                                             |
+
+### Audit `action` values
+
+The `action` field is a **stable event type** for filtering (`zoa audit --action …`). It is not the HTTP path. High-volume **read-only catalog** calls are intentionally **not** audited (no row, no `action`).
+
+| Audited? | Plane | HTTP / CLI | `action` value |
+| -------- | ----- | ---------- | -------------- |
+| Yes | Access | `POST …/sessions/start` · `zoa session start` | `session_start` |
+| Yes | Access | `POST …/sessions/join/{id}` | `session_join` |
+| Yes | Access | `POST …/sessions/terminate/{id}` | `session_terminate` |
+| Yes | Access | `POST …/sessions/exec-attached/{id}` | `session_exec_attached` |
+| Yes | Access | `GET …/sessions` without `scope=mine` · `zoa session history` | `session_history` |
+| No | Access | `GET …/sessions?scope=mine` · `zoa session list` | — (self-service; avoid noise) |
+| No | Access | `GET …/targets` · `zoa targets` | — (read-only catalog) |
+| No | Access | `GET /health`, `GET /version` | — |
+| Yes | API | `POST …/trusted-actions/{ta}/run` · `zoa run` | **TA registry name** (e.g. `get_db_resource`) |
+| Yes | API | `GET …/trusted-actions/runs` · `zoa runs` | `runs_list` |
+| Yes | API | `GET …/trusted-actions/runs/{id}` · `zoa get` | `run_get` |
+| Yes | API | `GET …/runs/{id}/output` · `zoa output` / `download` | `run_output` |
+| Yes | API | `GET …/runs/{id}/logs` · `zoa logs` | `run_logs` |
+| Yes | API | `GET /api/v0/audit` · `zoa audit` | `audit_query` |
+| No | API | `GET …/trusted-actions` · `zoa actions` | — (read-only catalog) |
+| No | API | `GET …/trusted-actions/{action}` · `zoa describe` | — (read-only catalog) |
+| No | API | `GET /health`, `GET /version` | — |
+
+**Families:** `session_*` = Access session plane; TA name = Trusted Action dispatch; `runs_*` / `run_*` = execution reads; `audit_query` = querying the audit index itself.
 
 ### Response
 
