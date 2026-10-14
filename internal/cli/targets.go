@@ -31,7 +31,15 @@ metadata (VPC, subnets, ECS, Function URL, etc.); use -o json for automation.`,
   zoa targets us-east-1 -o wide
 
   zoa targets us-east-1 -o json`,
-		Args: cobra.ExactArgs(1),
+		Args: func(_ *cobra.Command, args []string) error {
+			if len(args) < 1 {
+				return fmt.Errorf("deployment is required: zoa targets <deployment>\n\n  Run 'zoa deployments' to list deployment names")
+			}
+			if len(args) > 1 {
+				return fmt.Errorf("too many arguments: expected one deployment name (got %d)", len(args))
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			deployment := args[0]
 			if opts.APIURL == "" {

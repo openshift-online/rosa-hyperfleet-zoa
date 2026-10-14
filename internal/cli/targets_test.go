@@ -5,9 +5,29 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/openshift-online/rosa-hyperfleet-zoa/internal/client"
 	"github.com/openshift-online/rosa-hyperfleet-zoa/internal/output"
 )
+
+func TestTargets_WhenDeploymentMissing_ItShouldReturnHelpfulError(t *testing.T) {
+	root := &cobra.Command{Use: "zoa"}
+	root.AddCommand(newTargetsCommand(&GlobalOptions{}))
+	root.SetArgs([]string{"targets"})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error when deployment is missing")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "deployment is required") {
+		t.Fatalf("expected deployment hint, got: %s", msg)
+	}
+	if !strings.Contains(msg, "zoa deployments") {
+		t.Fatalf("expected pointer to zoa deployments, got: %s", msg)
+	}
+}
 
 func TestPrintTargetsTable_WhenDefault_ItShouldOmitInfrastructureColumns(t *testing.T) {
 	items := []client.Target{{
