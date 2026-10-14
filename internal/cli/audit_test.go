@@ -189,3 +189,20 @@ func TestListAudit_WhenClientReturnsError_ItShouldPropagateError(t *testing.T) {
 		t.Errorf("expected 'database unavailable', got %q", err.Error())
 	}
 }
+
+func TestFormatAuditPathForTable_WhenV0Paths_ItShouldStripPrefixOnly(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		{"/api/v0/trusted-actions/list_eks_clusters/run", "trusted-actions/list_eks_clusters/run"},
+		{"/api/v0/trusted-actions/audit", "trusted-actions/audit"},
+		{"/api/v0/sessions/start", "sessions/start"},
+		{"/api/v0/sessions/join/abc", "sessions/join/abc"},
+		{"/health", "/health"},
+	}
+	for _, tc := range tests {
+		if got := formatAuditPathForTable(tc.in); got != tc.want {
+			t.Errorf("formatAuditPathForTable(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}

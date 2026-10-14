@@ -194,7 +194,7 @@ func listAudit(ctx context.Context, global *GlobalOptions, opts *auditOptions) e
 			reasonStr: reasonCol,
 			approval:  output.Dash(e.ApprovalState),
 			execID:    output.Dash(e.ExecutionID),
-			path:      strings.TrimPrefix(output.Dash(e.Path), "/api/v0/trusted-actions/"),
+			path:      formatAuditPathForTable(output.Dash(e.Path)),
 		})
 	}
 
@@ -234,4 +234,15 @@ func listAudit(ctx context.Context, global *GlobalOptions, opts *auditOptions) e
 	}
 
 	return nil
+}
+
+// formatAuditPathForTable normalizes stored paths for human tables: drop /api/v0/
+// so PATH shows the API surface (sessions/..., trusted-actions/..., future breakglass/...).
+// JSON output keeps the full path from the API.
+func formatAuditPathForTable(path string) string {
+	const prefix = "/api/v0/"
+	if strings.HasPrefix(path, prefix) {
+		return path[len(prefix):]
+	}
+	return path
 }
