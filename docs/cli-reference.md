@@ -317,10 +317,10 @@ zoa run get_db_resource --reason ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1
 # Full objects (spec/status/metadata) instead of the summary table
 zoa run get_db_resource --reason ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1/Cluster -A -v
 
-# Pipe full objects into jq (-o json wraps the TA payload in the execution object)
+# Pipe full objects into jq (needs -v for spec/status to exist; -o json wraps output, so index .output[].spec)
 zoa run get_db_resource --reason ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1/Cluster -A -v -o json | jq '.output[].spec'
 
-# Same data without -o json (TA output only on stdout; handy for jq without .output)
+# Same, without -o json (needs -v for spec/status to exist; output is the bare array, so index .[].spec)
 zoa run get_db_resource --reason ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1/Cluster -A -v | jq '.[].spec'
 ```
 
