@@ -157,10 +157,10 @@ func (m *mockExecVendorAccess) VendForTask(_ context.Context, _, _, _, _, _ stri
 	if m != nil && m.err != nil {
 		return nil, m.err
 	}
-	return &execcreds.APICredentials{
-		AccessKeyID:     "AKIATEST",
-		SecretAccessKey: "secret",
-		SessionToken:    "token",
+	return &execcreds.APICredentials{ // notsecret — fake credentials for unit test
+		AccessKeyID:     "AKIATEST", // notsecret
+		SecretAccessKey: "secret",   // notsecret
+		SessionToken:    "token",    // notsecret
 		Expiration:      "2030-01-01T00:00:00Z",
 	}, nil
 }

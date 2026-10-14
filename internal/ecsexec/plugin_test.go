@@ -13,10 +13,10 @@ func TestPluginEnv_WhenRegionProvidedItShouldPinAWSRegion(t *testing.T) {
 	t.Setenv("AWS_DEFAULT_REGION", "eu-west-1")
 	t.Setenv("AWS_PROFILE", "central-dev")
 
-	creds := aws.Credentials{
-		AccessKeyID:     "AKIAEXAMPLE",
-		SecretAccessKey: "secret",
-		SessionToken:    "token",
+	creds := aws.Credentials{ // notsecret — fake credentials for unit test
+		AccessKeyID:     "AKIAEXAMPLE", // notsecret
+		SecretAccessKey: "secret",      // notsecret
+		SessionToken:    "token",       // notsecret
 	}
 
 	env, err := pluginEnv("us-east-1", creds)
