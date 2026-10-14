@@ -24,7 +24,7 @@ The `zoa` CLI communicates with ZOA via SigV4-signed HTTPS (Access Lambda for se
 The CLI is deliberately built around **SRE muscle memory** — the patterns and conventions that operators have internalized from years of daily use of `kubectl`, `aws-cli`, and `oc`. This means:
 
 - **Familiar flags**: `-n` for namespace, `-o json` for machine output, `-A` for all-namespaces, `-v` for verbose — no learning curve
-- **Composable output**: table by default (human), JSON for piping into `jq`, same pattern as `kubectl get -o json | jq`
+- **Composable output**: table by default (human). For `zoa run`, piping to `jq` usually needs **`-v`** (full objects). With **`-o json`**, stdout is the execution envelope — use `jq '.output[]…'`; without **`-o json`**, stdout is TA output only (`jq '.[]…'`).
 - **Subcommand structure**: verb-first (`run`, `get`, `describe`, `logs`) mirrors kubectl's mental model
 - **Predictable behavior**: `--dry-run` previews, `--force` overrides safety, `--wait` blocks until done — exactly what you'd expect
 - **Shell completion**: full zsh/bash/fish completion so discoverability is instant
@@ -296,7 +296,7 @@ Focused guides for Trusted Actions that need extra context beyond `zoa describe`
 
 Resources are keyed by GVK (`Group/Version/Kind`). The core group has an empty group, so if a core resource is ever present its GVK starts with a leading slash (e.g. `/v1/ConfigMap`).
 
-By default the output is a kubectl-style summary table (NAMESPACE, NAME, VERSION, AGE, STATE). Add `-v` for the full objects (spec/status/metadata) or `-o json` to pipe into `jq`.
+By default the output is a kubectl-style summary table (NAMESPACE, NAME, VERSION, AGE, STATE). Add `-v` for the full objects (spec/status/metadata). To pipe into `jq`, use `-v` and either pipe **stdout** directly (default format) or add **`-o json`** and select the `output` field (execution envelope).
 
 ```bash
 # Discover which resource types exist (with object counts). Run this first.
@@ -317,8 +317,11 @@ zoa run get_db_resource --reason ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1
 # Full objects (spec/status/metadata) instead of the summary table
 zoa run get_db_resource --reason ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1/Cluster -A -v
 
-# Pipe the full objects into jq
-zoa run get_db_resource --reason ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1/Cluster -A -o json | jq '.[].spec'
+# Pipe full objects into jq (-o json wraps the TA payload in the execution object)
+zoa run get_db_resource --reason ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1/Cluster -A -v -o json | jq '.output[].spec'
+
+# Same data without -o json (TA output only on stdout; handy for jq without .output)
+zoa run get_db_resource --reason ROSAENG-1234 --param gvk=hyperfleet.io/v1alpha1/Cluster -A -v | jq '.[].spec'
 ```
 
 **Notes:**

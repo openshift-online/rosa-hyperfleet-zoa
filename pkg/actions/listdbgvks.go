@@ -32,6 +32,7 @@ func (a *listDBGVKs) Metadata() ActionMetadata {
 		TimeoutSeconds: 30,
 		Examples: []string{
 			"zoa run list_db_gvks --reason ROSAENG-1234",
+			"zoa run list_db_gvks --reason ROSAENG-1234 -o json",
 		},
 		Parameters: []ParameterDef{},
 	}
