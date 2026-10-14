@@ -2,10 +2,10 @@
 
 ZOA exposes its APIs through **two Lambda Function URLs**, each serving a different operational plane:
 
-| Lambda | `HANDLER_MODE` | Caller | Purpose |
-|--------|----------------|--------|---------|
-| **Access** | `access` | SRE laptop (via SSM autodiscovery) | Session lifecycle, targets, approval (future) |
-| **API** | `api` | Boundary task (`ZOA_API_URL` env var) | Trusted Action execution, runs, audit |
+| Lambda     | `HANDLER_MODE` | Caller                                | Purpose                                       |
+| ---------- | -------------- | ------------------------------------- | --------------------------------------------- |
+| **Access** | `access`       | SRE laptop (via SSM autodiscovery)    | Session lifecycle, targets, approval (future) |
+| **API**    | `api`          | Boundary task (`ZOA_API_URL` env var) | Trusted Action execution, runs, audit         |
 
 Both share the same `/api/v0` prefix, error envelope, and authentication model. Health and version endpoints are available on both.
 
@@ -40,10 +40,10 @@ Each target VPC (RC or MC) has its own API Lambda. Inside the boundary, `ZOA_API
 
 ### Common headers
 
-| Header | Required | Description |
-|--------|----------|-------------|
-| `X-Account-ID` | Yes | AWS account ID of the caller (set by CLI from STS) |
-| `X-Operator` | Yes | Caller ARN from `GetCallerIdentity` (API: identity bridge maps task role → operator) |
+| Header         | Required | Description                                                                          |
+| -------------- | -------- | ------------------------------------------------------------------------------------ |
+| `X-Account-ID` | Yes      | AWS account ID of the caller (set by CLI from STS)                                   |
+| `X-Operator`   | Yes      | Caller ARN from `GetCallerIdentity` (API: identity bridge maps task role → operator) |
 
 ---
 
@@ -55,35 +55,35 @@ Served by the Access Lambda (`HANDLER_MODE=access`) in the RC account (no VPC at
 
 ### Health & Version
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | Health check (200 OK) |
-| `GET` | `/version` | Server version, commit, build time, mode=access |
+| Method | Path       | Description                                     |
+| ------ | ---------- | ----------------------------------------------- |
+| `GET`  | `/health`  | Health check (200 OK)                           |
+| `GET`  | `/version` | Server version, commit, build time, mode=access |
 
 ### Targets
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/v0/targets` | List targets (RC + MC) for the deployment |
+| Method | Path              | Description                               |
+| ------ | ----------------- | ----------------------------------------- |
+| `GET`  | `/api/v0/targets` | List targets (RC + MC) for the deployment |
 
 ### Sessions
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/v0/sessions/start` | Start a boundary session |
-| `GET` | `/api/v0/sessions` | List sessions (filters: `scope`, `status`, `operator`, `target`, `since`, `until`, `limit`) |
-| `POST` | `/api/v0/sessions/terminate/{id}` | Terminate a session (stops ECS task if running) |
-| `POST` | `/api/v0/sessions/join/{id}` | Join a session (provisions boundary task if needed, returns ECS Exec credentials) |
-| `POST` | `/api/v0/sessions/exec-attached/{id}` | Record ECS Exec session attachment (called by CLI after `session-manager-plugin` connects) |
+| Method | Path                                  | Description                                                                                 |
+| ------ | ------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `POST` | `/api/v0/sessions/start`              | Start a boundary session                                                                    |
+| `GET`  | `/api/v0/sessions`                    | List sessions (filters: `scope`, `status`, `operator`, `target`, `since`, `until`, `limit`) |
+| `POST` | `/api/v0/sessions/terminate/{id}`     | Terminate a session (stops ECS task if running)                                             |
+| `POST` | `/api/v0/sessions/join/{id}`          | Join a session (provisions boundary task if needed, returns ECS Exec credentials)           |
+| `POST` | `/api/v0/sessions/exec-attached/{id}` | Record ECS Exec session attachment (called by CLI after `session-manager-plugin` connects)  |
 
 ### Approval (future)
 
 Approval stubs are registered on the Access Lambda today. The approval workflow will expand to cover TAs and break-glass when those features ship.
 
-| Method | Path | Description |
-|--------|------|-------------|
+| Method | Path                   | Description                          |
+| ------ | ---------------------- | ------------------------------------ |
 | `POST` | `/api/v0/approve/{id}` | Approve request (stub — returns 501) |
-| `POST` | `/api/v0/reject/{id}` | Reject request (stub — returns 501) |
+| `POST` | `/api/v0/reject/{id}`  | Reject request (stub — returns 501)  |
 
 ---
 
@@ -102,12 +102,12 @@ Start a new boundary session.
 }
 ```
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `deployment_name` | string | Yes | Deployment name (from `zoa deployments`) |
-| `target` | string | Yes | Target cluster ID (from `zoa targets`) |
-| `reason` | string | Yes | Jira ticket or PagerDuty incident (validated format) |
-| `timeout_hours` | int | No | Session duration in hours (default: max configured, bounded by server max) |
+| Field             | Type   | Required | Description                                                                |
+| ----------------- | ------ | -------- | -------------------------------------------------------------------------- |
+| `deployment_name` | string | Yes      | Deployment name (from `zoa deployments`)                                   |
+| `target`          | string | Yes      | Target cluster ID (from `zoa targets`)                                     |
+| `reason`          | string | Yes      | Jira ticket or PagerDuty incident (validated format)                       |
+| `timeout_hours`   | int    | No       | Session duration in hours (default: max configured, bounded by server max) |
 
 ### Response
 
@@ -123,15 +123,15 @@ Start a new boundary session.
 
 ### Error Responses
 
-| Code | Reason | Description |
-|------|--------|-------------|
-| 400 | `invalid_identity` | Cannot extract SRE identity from `X-Operator` |
-| 400 | `invalid_request` | Invalid JSON body |
-| 400 | `missing_target` | Target field is required |
-| 400 | `missing_reason` | Reason is required |
-| 400 | `invalid_reason` | Reason format invalid (must be Jira/PD format) |
-| 400 | `invalid_timeout` | Timeout exceeds configured maximum |
-| 404 | `target_not_found` | Target not registered |
+| Code | Reason             | Description                                    |
+| ---- | ------------------ | ---------------------------------------------- |
+| 400  | `invalid_identity` | Cannot extract SRE identity from `X-Operator`  |
+| 400  | `invalid_request`  | Invalid JSON body                              |
+| 400  | `missing_target`   | Target field is required                       |
+| 400  | `missing_reason`   | Reason is required                             |
+| 400  | `invalid_reason`   | Reason format invalid (must be Jira/PD format) |
+| 400  | `invalid_timeout`  | Timeout exceeds configured maximum             |
+| 404  | `target_not_found` | Target not registered                          |
 
 ---
 
@@ -141,15 +141,15 @@ List sessions. Used by both `zoa session list` (own sessions) and `zoa session h
 
 ### Query Parameters
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `scope` | string | `mine` for own sessions only (default: all operators) |
-| `status` | string | Filter by session status (`active`, `terminated`, `failed`, `creating`) |
-| `operator` | string | Filter by operator (not allowed with `scope=mine`) |
-| `target` | string | Filter by target cluster |
-| `since` | string | Start of time window (duration: `1h`, `7d`; date: `2026-08-25`; RFC3339) |
-| `until` | string | End of time window (same formats as `since`; default: now) |
-| `limit` | int | Max results (default 50, max 200) |
+| Param      | Type   | Description                                                              |
+| ---------- | ------ | ------------------------------------------------------------------------ |
+| `scope`    | string | `mine` for own sessions only (default: all operators)                    |
+| `status`   | string | Filter by session status (`active`, `terminated`, `failed`, `creating`)  |
+| `operator` | string | Filter by operator (not allowed with `scope=mine`)                       |
+| `target`   | string | Filter by target cluster                                                 |
+| `since`    | string | Start of time window (duration: `1h`, `7d`; date: `2026-08-25`; RFC3339) |
+| `until`    | string | End of time window (same formats as `since`; default: now)               |
+| `limit`    | int    | Max results (default 50, max 200)                                        |
 
 ### Response
 
@@ -181,12 +181,12 @@ Terminate a session. Stops the ECS task if running and marks the session as term
 
 ### Error Responses
 
-| Code | Reason | Description |
-|------|--------|-------------|
-| 403 | `forbidden` | Only the session owner can terminate it |
-| 404 | `not_found` | Session not found |
-| 409 | `invalid_status` | Session is not active or creating |
-| 502 | `task_terminate_failed` | ECS StopTask failed |
+| Code | Reason                  | Description                             |
+| ---- | ----------------------- | --------------------------------------- |
+| 403  | `forbidden`             | Only the session owner can terminate it |
+| 404  | `not_found`             | Session not found                       |
+| 409  | `invalid_status`        | Session is not active or creating       |
+| 502  | `task_terminate_failed` | ECS StopTask failed                     |
 
 ---
 
@@ -216,13 +216,13 @@ Join a session. Provisions the boundary ECS task if not already running (status=
 
 ### Error Responses
 
-| Code | Reason | Description |
-|------|--------|-------------|
-| 403 | `forbidden` | Only the session owner can join |
-| 404 | `not_found` | Session not found |
-| 409 | `invalid_status` | Session is terminated or failed |
-| 502 | `ecs_error` | RunTask failed |
-| 500 | `session_update_error` | Task started but session state update failed |
+| Code | Reason                 | Description                                  |
+| ---- | ---------------------- | -------------------------------------------- |
+| 403  | `forbidden`            | Only the session owner can join              |
+| 404  | `not_found`            | Session not found                            |
+| 409  | `invalid_status`       | Session is terminated or failed              |
+| 502  | `ecs_error`            | RunTask failed                               |
+| 500  | `session_update_error` | Task started but session state update failed |
 
 ---
 
@@ -240,10 +240,10 @@ Record that an ECS Exec session has attached. Called by the CLI after `session-m
 
 ### Error Responses
 
-| Code | Reason | Description |
-|------|--------|-------------|
-| 400 | `invalid_exec_session_id` | Exec session ID format invalid |
-| 403 | `forbidden` | Only the session owner can record attachments |
+| Code | Reason                    | Description                                   |
+| ---- | ------------------------- | --------------------------------------------- |
+| 400  | `invalid_exec_session_id` | Exec session ID format invalid                |
+| 403  | `forbidden`               | Only the session owner can record attachments |
 
 ---
 
@@ -251,39 +251,48 @@ Record that an ECS Exec session has attached. Called by the CLI after `session-m
 
 Served by the API Lambda (`HANDLER_MODE=api`) in each target VPC.
 
+**Route families under `/api/v0`:**
+
+| Prefix                     | Purpose                                              |
+| -------------------------- | ---------------------------------------------------- |
+| `/api/v0/trusted-actions/` | TA catalog, dispatch, runs, artifacts                |
+| `/api/v0/audit`            | Fleet-wide audit query (not under `trusted-actions`) |
+
+Session routes (`/api/v0/sessions/...`, `/api/v0/targets`) are on the **Access** Lambda; their audit rows appear in the same DynamoDB table and in `GET /api/v0/audit` results.
+
 ## Endpoints
 
 ### Health & Version
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | Health check (200 OK) |
-| `GET` | `/version` | Server version, commit, build time, target cluster |
+| Method | Path       | Description                                        |
+| ------ | ---------- | -------------------------------------------------- |
+| `GET`  | `/health`  | Health check (200 OK)                              |
+| `GET`  | `/version` | Server version, commit, build time, target cluster |
 
 ### Trusted Actions
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/v0/trusted-actions` | List all registered TAs |
-| `GET` | `/api/v0/trusted-actions/{action}` | Describe a specific TA (params, scope, RBAC) |
-| `POST` | `/api/v0/trusted-actions/{action}/run` | Execute a TA |
+| Method | Path                                   | Description                                  |
+| ------ | -------------------------------------- | -------------------------------------------- |
+| `GET`  | `/api/v0/trusted-actions`              | List all registered TAs                      |
+| `GET`  | `/api/v0/trusted-actions/{action}`     | Describe a specific TA (params, scope, RBAC) |
+| `POST` | `/api/v0/trusted-actions/{action}/run` | Execute a TA                                 |
 
 ### Executions
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/v0/trusted-actions/runs` | List executions (with filters) |
-| `GET` | `/api/v0/trusted-actions/runs/{id}` | Get execution details |
-| `GET` | `/api/v0/trusted-actions/runs/{id}/output` | Download execution output (streaming) |
-| `GET` | `/api/v0/trusted-actions/runs/{id}/logs` | Download execution logs (streaming) |
+| Method | Path                                       | Description                           |
+| ------ | ------------------------------------------ | ------------------------------------- |
+| `GET`  | `/api/v0/trusted-actions/runs`             | List executions (with filters)        |
+| `GET`  | `/api/v0/trusted-actions/runs/{id}`        | Get execution details                 |
+| `GET`  | `/api/v0/trusted-actions/runs/{id}/output` | Download execution output (streaming) |
+| `GET`  | `/api/v0/trusted-actions/runs/{id}/logs`   | Download execution logs (streaming)   |
 
 ### Audit (platform)
 
 Fleet-wide audit log (TA runs, session operations, and this query itself). Not under `/trusted-actions/`.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/v0/audit` | Query audit trail |
+| Method | Path            | Description       |
+| ------ | --------------- | ----------------- |
+| `GET`  | `/api/v0/audit` | Query audit trail |
 
 ---
 
@@ -307,14 +316,14 @@ Execute a Trusted Action. Called from inside the boundary via `zoa run`.
 }
 ```
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `reason` | string | Yes | Jira issue or PagerDuty incident (e.g. `ROSAENG-1234`, `#123456`) |
-| `params` | object | Depends on TA | Key-value parameters for the TA |
-| `force` | bool | No | Bypass write cooldown (write TAs), max concurrent limit (all TAs), and TA-level safety checks (e.g., owner reference protection in `delete_pod`) |
-| `dry_run` | bool | No | Execute the TA's DryRunAction instead |
-| `execution_mode` | string | No | Override TA's default mode (`sync` or `async`) |
-| `timeout_seconds` | int | No | Override TA's default timeout (bounded by server max) |
+| Field             | Type   | Required      | Description                                                                                                                                      |
+| ----------------- | ------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `reason`          | string | Yes           | Jira issue or PagerDuty incident (e.g. `ROSAENG-1234`, `#123456`)                                                                                |
+| `params`          | object | Depends on TA | Key-value parameters for the TA                                                                                                                  |
+| `force`           | bool   | No            | Bypass write cooldown (write TAs), max concurrent limit (all TAs), and TA-level safety checks (e.g., owner reference protection in `delete_pod`) |
+| `dry_run`         | bool   | No            | Execute the TA's DryRunAction instead                                                                                                            |
+| `execution_mode`  | string | No            | Override TA's default mode (`sync` or `async`)                                                                                                   |
+| `timeout_seconds` | int    | No            | Override TA's default timeout (bounded by server max)                                                                                            |
 
 ### Response (sync, success)
 
@@ -342,16 +351,16 @@ Execute a Trusted Action. Called from inside the boundary via `zoa run`.
 
 ### Error Responses
 
-| Code | Reason | Description |
-|------|--------|-------------|
-| 400 | `invalid_body` | Request body parse failure |
-| 400 | `invalid_params` | Missing required param or unknown param |
-| 400 | `missing_reason` / `invalid_reason` | Reason missing or format invalid |
-| 400 | `missing_account` | `X-Account-ID` header missing |
-| 400 | `timeout_exceeded` | Requested timeout exceeds server maximum |
-| 404 | `action_not_found` | TA not registered |
-| 429 | `write_cooldown` | Write action executed too recently (use `force=true`) |
-| 429 | `max_concurrent` | Too many active executions on target |
+| Code | Reason                              | Description                                           |
+| ---- | ----------------------------------- | ----------------------------------------------------- |
+| 400  | `invalid_body`                      | Request body parse failure                            |
+| 400  | `invalid_params`                    | Missing required param or unknown param               |
+| 400  | `missing_reason` / `invalid_reason` | Reason missing or format invalid                      |
+| 400  | `missing_account`                   | `X-Account-ID` header missing                         |
+| 400  | `timeout_exceeded`                  | Requested timeout exceeds server maximum              |
+| 404  | `action_not_found`                  | TA not registered                                     |
+| 429  | `write_cooldown`                    | Write action executed too recently (use `force=true`) |
+| 429  | `max_concurrent`                    | Too many active executions on target                  |
 
 ---
 
@@ -373,7 +382,7 @@ Get execution details.
   "dry_run": false,
   "reason": "ROSAENG-1234",
   "operator": "slopezma",
-  "params": {"namespace": "kube-system", "resource": "pods"},
+  "params": { "namespace": "kube-system", "resource": "pods" },
   "revision": "df90d53",
   "created_at": "2026-08-17T10:08:29.123Z",
   "dispatched_at": "2026-08-17T10:08:29.123Z",
@@ -386,12 +395,12 @@ Get execution details.
 
 ### Statuses
 
-| Status | Meaning |
-|--------|---------|
-| `dispatched` | Created, awaiting execution |
-| `succeeded` | Completed successfully |
-| `failed` | Execution failed (check logs) |
-| `timed_out` | Exceeded timeout deadline |
+| Status       | Meaning                       |
+| ------------ | ----------------------------- |
+| `dispatched` | Created, awaiting execution   |
+| `succeeded`  | Completed successfully        |
+| `failed`     | Execution failed (check logs) |
+| `timed_out`  | Exceeded timeout deadline     |
 
 ---
 
@@ -401,11 +410,11 @@ List executions with optional filters.
 
 ### Query Parameters
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `status` | string | Filter by status |
-| `action` | string | Filter by action name |
-| `limit` | int | Max results (default 50) |
+| Param    | Type   | Description              |
+| -------- | ------ | ------------------------ |
+| `status` | string | Filter by status         |
+| `action` | string | Filter by action name    |
+| `limit`  | int    | Max results (default 50) |
 
 ---
 
@@ -431,11 +440,11 @@ Query the audit trail. Records TA executions (API Lambda), session operations (A
 
 ### Query Parameters
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `action` | string | Filter by action (TA name or session action like `session_start`) |
-| `operator` | string | Filter by operator |
-| `limit` | int | Max results (default 50) |
+| Param      | Type   | Description                                                       |
+| ---------- | ------ | ----------------------------------------------------------------- |
+| `action`   | string | Filter by action (TA name or session action like `session_start`) |
+| `operator` | string | Filter by operator                                                |
+| `limit`    | int    | Max results (default 50)                                          |
 
 ### Response
 
@@ -445,7 +454,7 @@ Query the audit trail. Records TA executions (API Lambda), session operations (A
     {
       "timestamp": "2026-08-17T10:08:38.000Z",
       "method": "POST",
-      "path": "list_eks_clusters/run",
+      "path": "/api/v0/trusted-actions/list_eks_clusters/run",
       "status_code": 202,
       "operator": "slopezma",
       "action": "list_eks_clusters",
@@ -496,8 +505,12 @@ Describe a specific TA including parameters, RBAC, and metadata.
   "description": "Get or list Kubernetes resources...",
   "timeout_seconds": 60,
   "parameters": [
-    {"name": "resource", "required": true, "description": "Resource type"},
-    {"name": "namespace", "required": false, "description": "Target namespace"}
+    { "name": "resource", "required": true, "description": "Resource type" },
+    {
+      "name": "namespace",
+      "required": false,
+      "description": "Target namespace"
+    }
   ],
   "authorization": {
     "approval": "none"

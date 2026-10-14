@@ -463,6 +463,19 @@ func TestHandleAudit_WhenCalled_ItShouldRecordAudit(t *testing.T) {
 	if auditStore.recorded[0].Method != "GET" {
 		t.Errorf("expected method=GET, got %s", auditStore.recorded[0].Method)
 	}
+	if auditStore.recorded[0].Path != "/api/v0/audit" {
+		t.Errorf("expected recorded path /api/v0/audit, got %q", auditStore.recorded[0].Path)
+	}
+}
+
+func TestHandleAudit_WhenLegacyTrustedActionsAuditPath_ItShouldReturn404(t *testing.T) {
+	h := testHandlerWithAudit(&mockExecStore{}, &mockAuditStoreWithData{})
+
+	rr := doRequest(h, "GET", "/api/v0/trusted-actions/audit", nil, defaultHeaders())
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for legacy audit path, got %d: %s", rr.Code, rr.Body.String())
+	}
 }
 
 // --- parseTimeValue ---

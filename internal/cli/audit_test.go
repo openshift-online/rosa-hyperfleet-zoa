@@ -190,6 +190,72 @@ func TestListAudit_WhenClientReturnsError_ItShouldPropagateError(t *testing.T) {
 	}
 }
 
+func TestListAudit_WhenTableOutput_ItShouldShowRouteFamiliesInPathColumn(t *testing.T) {
+	mock := &mockClient{
+		listAuditFn: func(_ context.Context, _ url.Values) (*client.AuditList, error) {
+			return &client.AuditList{
+				Items: []client.AuditEntry{
+					{
+						Timestamp:  "2024-06-01T10:00:00Z",
+						Method:     "GET",
+						Path:       "/api/v0/audit",
+						StatusCode: 200,
+						Operator:   "slopezma",
+						Action:     "",
+					},
+					{
+						Timestamp:  "2024-06-01T10:01:00Z",
+						Method:     "POST",
+						Path:       "/api/v0/sessions/start",
+						StatusCode: 200,
+						Operator:   "slopezma",
+						Action:     "session_start",
+					},
+					{
+						Timestamp:  "2024-06-01T10:02:00Z",
+						Method:     "POST",
+						Path:       "/api/v0/trusted-actions/list_eks_clusters/run",
+						StatusCode: 202,
+						Operator:   "slopezma",
+						Action:     "list_eks_clusters",
+					},
+				},
+			}, nil
+		},
+	}
+
+	global := newMockGlobalOpts(mock)
+	opts := &auditOptions{limit: 50}
+
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+
+	err = listAudit(context.Background(), global, opts)
+	w.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var out bytes.Buffer
+	if _, err := io.Copy(&out, r); err != nil {
+		t.Fatal(err)
+	}
+	s := out.String()
+	for _, want := range []string{"audit", "sessions/start", "trusted-actions/list_eks_clusters/run"} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("expected PATH column to contain %q, got:\n%s", want, s)
+		}
+	}
+	if strings.Contains(s, "/api/v0/") {
+		t.Fatalf("table output should not contain /api/v0/, got:\n%s", s)
+	}
+}
+
 func TestFormatAuditPathForTable_WhenV0Paths_ItShouldStripPrefixOnly(t *testing.T) {
 	tests := []struct {
 		in, want string
