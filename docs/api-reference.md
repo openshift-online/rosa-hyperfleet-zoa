@@ -251,15 +251,6 @@ Record that an ECS Exec session has attached. Called by the CLI after `session-m
 
 Served by the API Lambda (`HANDLER_MODE=api`) in each target VPC.
 
-**Route families under `/api/v0`:**
-
-| Prefix                     | Purpose                                              |
-| -------------------------- | ---------------------------------------------------- |
-| `/api/v0/trusted-actions/` | TA catalog, dispatch, runs, artifacts                |
-| `/api/v0/audit`            | Fleet-wide audit query (not under `trusted-actions`) |
-
-Session routes (`/api/v0/sessions/...`, `/api/v0/targets`) are on the **Access** Lambda; their audit rows appear in the same DynamoDB table and in `GET /api/v0/audit` results.
-
 ## Endpoints
 
 ### Health & Version
@@ -286,9 +277,7 @@ Session routes (`/api/v0/sessions/...`, `/api/v0/targets`) are on the **Access**
 | `GET`  | `/api/v0/trusted-actions/runs/{id}/output` | Download execution output (streaming) |
 | `GET`  | `/api/v0/trusted-actions/runs/{id}/logs`   | Download execution logs (streaming)   |
 
-### Audit (platform)
-
-Fleet-wide audit log (TA runs, session operations, and this query itself). Not under `/trusted-actions/`.
+### Audit
 
 | Method | Path            | Description       |
 | ------ | --------------- | ----------------- |

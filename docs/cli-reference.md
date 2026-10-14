@@ -50,11 +50,11 @@ zoa version
 
 Other platforms — replace the binary name in the commands above:
 
-| OS / Arch | Binary |
-|-----------|--------|
-| Linux x86_64 | `zoa-linux-amd64` |
-| Linux ARM64 | `zoa-linux-arm64` |
-| macOS Intel | `zoa-darwin-amd64` |
+| OS / Arch           | Binary             |
+| ------------------- | ------------------ |
+| Linux x86_64        | `zoa-linux-amd64`  |
+| Linux ARM64         | `zoa-linux-arm64`  |
+| macOS Intel         | `zoa-darwin-amd64` |
 | macOS Apple Silicon | `zoa-darwin-arm64` |
 
 On macOS, `sha256sum` is not installed by default. Use the built-in equivalent:
@@ -107,11 +107,11 @@ export ZOA_API_URL="https://<id>.lambda-url.<region>.on.aws"
 
 **Rule:** when a command exposes a **flag** for the same setting, an explicit flag **wins** over the environment variable. Env vars are defaults (especially in the boundary task); flags are overrides.
 
-| Variable | Purpose | CLI flag | Commands |
-|----------|---------|----------|----------|
-| `ZOA_API_URL` | API Lambda Function URL (which **target VPC / EKS cluster** TAs run against) | `--api-url` | `zoa run`, `runs`, `get`, `audit`, … (not session/discovery) |
-| `AWS_REGION` | Region for SigV4 / custom endpoints | `--region` | All commands that call AWS or the API |
-| `ZOA_REASON` | Default Jira/PD reason for the session | `--reason` | `zoa run`, `zoa session start` |
+| Variable          | Purpose                                                                                    | CLI flag        | Commands                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------ | --------------- | ------------------------------------------------------------------ |
+| `ZOA_API_URL`     | API Lambda Function URL (which **target VPC / EKS cluster** TAs run against)               | `--api-url`     | `zoa run`, `runs`, `get`, `audit`, … (not session/discovery)       |
+| `AWS_REGION`      | Region for SigV4 / custom endpoints                                                        | `--region`      | All commands that call AWS or the API                              |
+| `ZOA_REASON`      | Default Jira/PD reason for the session                                                     | `--reason`      | `zoa run`, `zoa session start`                                     |
 | `ZOA_TARGET_TYPE` | `rc` or `mc` for **offline** TA catalog filter (same meaning as **TYPE** in `zoa targets`) | `--target-type` | `zoa actions` (alias: `catalog`) / `zoa describe` with `--offline` |
 
 **Not env-backed (flags only):** TA **parameters** on `zoa run` (`-n`, `-A`, `--resource`, `--param`, …) — there is no `ZOA_NAMESPACE`-style env; use flags or `--param`.
@@ -126,31 +126,31 @@ export ZOA_API_URL="https://<id>.lambda-url.<region>.on.aws"
 
 These apply to **every** subcommand (`session`, `run`, `runs`, `audit`, …). When a flag and an env var set the same value, the **flag wins** (see [Environment variables and precedence](#environment-variables-and-precedence) for `ZOA_API_URL`, `AWS_REGION`, `ZOA_REASON`, and `ZOA_TARGET_TYPE`).
 
-| Flag | Short | Env var | Description |
-|------|-------|---------|-------------|
-| `--api-url` | | `ZOA_API_URL` | ZOA endpoint (Function URL or CNAME). Session/discovery commands use SSM autodiscovery instead unless you override. |
-| `--output` | `-o` | | `table` (default), `wide`, or `json` |
-| `--region` | | `AWS_REGION` | AWS region for SigV4 and custom endpoints |
-| `--help` | `-h` | | Help for the current command |
+| Flag        | Short | Env var       | Description                                                                                                         |
+| ----------- | ----- | ------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `--api-url` |       | `ZOA_API_URL` | ZOA endpoint (Function URL or CNAME). Session/discovery commands use SSM autodiscovery instead unless you override. |
+| `--output`  | `-o`  |               | `table` (default), `wide`, or `json`                                                                                |
+| `--region`  |       | `AWS_REGION`  | AWS region for SigV4 and custom endpoints                                                                           |
+| `--help`    | `-h`  |               | Help for the current command                                                                                        |
 
 ## Commands
 
 ### Discovery (laptop — Access Lambda via SSM autodiscovery)
 
-| Command | Description |
-|---------|-------------|
-| `deployments` | List ZOA deployments registered in SSM (default table: deployment + region; `-o wide` / `-o json` for full metadata) |
+| Command                | Description                                                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `deployments`          | List ZOA deployments registered in SSM (default table: deployment + region; `-o wide` / `-o json` for full metadata)                        |
 | `targets <deployment>` | List targets (RC + MC) for a deployment (default: target, region, type, status; `-o wide` / `-o json` for VPC, subnets, ECS, API URL, etc.) |
 
 ### Boundary sessions (laptop — Access Lambda)
 
-| Command | Description |
-|---------|-------------|
-| `session start <deployment> <target>` | Start a boundary session (default: ECS Exec shell; `--no-connect` for metadata only) |
-| `session join <deployment/session-id>` | Join an existing session via ECS Exec |
-| `session terminate <deployment/session-id>` | Terminate a session (stops ECS task if running) |
-| `session list <deployment>` | List your sessions (last 24h by default) |
-| `session history <deployment>` | Session history across all operators (audit view) |
+| Command                                     | Description                                                                          |
+| ------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `session start <deployment> <target>`       | Start a boundary session (default: ECS Exec shell; `--no-connect` for metadata only) |
+| `session join <deployment/session-id>`      | Join an existing session via ECS Exec                                                |
+| `session terminate <deployment/session-id>` | Terminate a session (stops ECS task if running)                                      |
+| `session list <deployment>`                 | List your sessions (last 24h by default)                                             |
+| `session history <deployment>`              | Session history across all operators (audit view)                                    |
 
 **Session start:** default opens ECS Exec after the task is active. **`--no-connect`** prints session id / task info and exits (same pattern as **`zoa run --no-wait`**: dispatch, show id, do not stay for the interactive part). Use **`zoa session join`** to attach later.
 
@@ -158,17 +158,17 @@ These apply to **every** subcommand (`session`, `run`, `runs`, `audit`, …). Wh
 
 ### Trusted Actions (boundary — API Lambda via `ZOA_API_URL`)
 
-| Command | Description |
-|---------|-------------|
-| `run <action>` | Execute a Trusted Action |
-| `runs` | List recent executions |
-| `get <id>` | Get execution details |
-| `output <id>` | Show execution output |
-| `logs <id>` | Show execution logs |
-| `download <id>` | Download output to a local file |
-| `actions` | List all available Trusted Actions (`catalog` is an alias) |
-| `describe <action>` | Show TA details (params, scope, timeout) |
-| `audit` | View audit trail |
+| Command             | Description                                                |
+| ------------------- | ---------------------------------------------------------- |
+| `run <action>`      | Execute a Trusted Action                                   |
+| `runs`              | List recent executions                                     |
+| `get <id>`          | Get execution details                                      |
+| `output <id>`       | Show execution output                                      |
+| `logs <id>`         | Show execution logs                                        |
+| `download <id>`     | Download output to a local file                            |
+| `actions`           | List all available Trusted Actions (`catalog` is an alias) |
+| `describe <action>` | Show TA details (params, scope, timeout)                   |
+| `audit`             | View audit trail                                           |
 
 ### Offline catalog
 
@@ -194,9 +194,9 @@ The **live API** (`zoa actions` without `--offline`) is the authoritative source
 
 ### General
 
-| Command | Description |
-|---------|-------------|
-| `version` | Print client and server version |
+| Command      | Description                       |
+| ------------ | --------------------------------- |
+| `version`    | Print client and server version   |
 | `completion` | Generate shell completion scripts |
 
 ## Examples
@@ -334,9 +334,9 @@ Per-command flags and filters (global flags are under [Configuration](#global-fl
 
 ### `actions` / `describe`
 
-| Flag | Description |
-|------|-------------|
-| `--offline` | Use the action registry embedded in this CLI build (no API call) |
+| Flag            | Description                                                                                     |
+| --------------- | ----------------------------------------------------------------------------------------------- |
+| `--offline`     | Use the action registry embedded in this CLI build (no API call)                                |
 | `--target-type` | Target type: `rc` or `mc` (env: `ZOA_TARGET_TYPE`; required with `--offline` unless env is set) |
 
 **Output formats** for `actions`: `table` (default), `json`, `markdown` (offline only — full catalog for Claude Code / docs).
@@ -345,33 +345,33 @@ Per-command flags and filters (global flags are under [Configuration](#global-fl
 
 ### `session start`
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--reason` | | Reason for this session (required unless `ZOA_REASON` is set on laptop; normally required on laptop; **flag wins over env**) |
-| `--deployment` | `-d` | Deployment name (alternative to positional arg) |
-| `--target` | `-t` | Target ID (alternative to positional arg) |
-| `--no-connect` | | Print session metadata only; do not open ECS Exec |
+| Flag           | Short | Description                                                                                                                  |
+| -------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `--reason`     |       | Reason for this session (required unless `ZOA_REASON` is set on laptop; normally required on laptop; **flag wins over env**) |
+| `--deployment` | `-d`  | Deployment name (alternative to positional arg)                                                                              |
+| `--target`     | `-t`  | Target ID (alternative to positional arg)                                                                                    |
+| `--no-connect` |       | Print session metadata only; do not open ECS Exec                                                                            |
 
 ### `session list`
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--status` | | Filter by status (`creating`, `active`, `terminated`, `failed`, `all`; default: `all`) |
-| `--target` | `-t` | Filter by target cluster |
-| `--since` | | Start of time window (default: `24h`). See [Time Formats](#time-formats). |
-| `--until` | | End of time window (default: now). See [Time Formats](#time-formats). |
-| `--limit` | | Max results (max 200, default 50) |
+| Flag       | Short | Description                                                                            |
+| ---------- | ----- | -------------------------------------------------------------------------------------- |
+| `--status` |       | Filter by status (`creating`, `active`, `terminated`, `failed`, `all`; default: `all`) |
+| `--target` | `-t`  | Filter by target cluster                                                               |
+| `--since`  |       | Start of time window (default: `24h`). See [Time Formats](#time-formats).              |
+| `--until`  |       | End of time window (default: now). See [Time Formats](#time-formats).                  |
+| `--limit`  |       | Max results (max 200, default 50)                                                      |
 
 ### `session history`
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--operator` | | Filter by operator |
-| `--target` | `-t` | Filter by target cluster |
-| `--status` | | Filter by status |
-| `--since` | | Start of time window (default: `24h`). See [Time Formats](#time-formats). |
-| `--until` | | End of time window (default: now). See [Time Formats](#time-formats). |
-| `--limit` | | Max results (max 200, default 50) |
+| Flag         | Short | Description                                                               |
+| ------------ | ----- | ------------------------------------------------------------------------- |
+| `--operator` |       | Filter by operator                                                        |
+| `--target`   | `-t`  | Filter by target cluster                                                  |
+| `--status`   |       | Filter by status                                                          |
+| `--since`    |       | Start of time window (default: `24h`). See [Time Formats](#time-formats). |
+| `--until`    |       | End of time window (default: now). See [Time Formats](#time-formats).     |
+| `--limit`    |       | Max results (max 200, default 50)                                         |
 
 ### `zoa run` — TA parameters
 
@@ -381,16 +381,16 @@ Trusted Actions declare **parameters** in code (see `zoa describe <action>`). On
 
 Common kube-api parameters have **dedicated flags** with short forms — same muscle memory as `kubectl`:
 
-| API param | CLI |
-|-----------|-----|
-| `namespace` | `-n` / `--namespace` |
+| API param        | CLI                                      |
+| ---------------- | ---------------------------------------- |
+| `namespace`      | `-n` / `--namespace`                     |
 | `all_namespaces` | `-A` / `--all-namespaces` (sends `true`) |
-| `label_selector` | `-l` / `--selector` |
-| `verbose` | `-v` / `--verbose` (sends `true`) |
-| `name` | `--name` |
-| `resource` | `--resource` |
-| `gather` | `--gather` (`must_gather`) |
-| `cluster_id` | `--cluster-id` (`must_gather` + `hcp`) |
+| `label_selector` | `-l` / `--selector`                      |
+| `verbose`        | `-v` / `--verbose` (sends `true`)        |
+| `name`           | `--name`                                 |
+| `resource`       | `--resource`                             |
+| `gather`         | `--gather` (`must_gather`)               |
+| `cluster_id`     | `--cluster-id` (`must_gather` + `hcp`)   |
 
 Use these when the TA accepts the matching parameter — they are equivalent to `--param <api_key>=<value>`.
 
@@ -411,36 +411,36 @@ Parameters that have **no** dedicated flag (for example `gvk` on `get_db_resourc
 
 ### `run`
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--reason` | | Reason for this run (required unless `ZOA_REASON` is set; **flag wins over env** — see [Environment variables](#environment-variables-and-precedence)) |
-| `--namespace` | `-n` | Target namespace |
-| `--all-namespaces` | `-A` | All namespaces |
-| `--name` | | Resource name |
-| `--resource` | | Resource type (for generic actions) |
-| `--selector` | `-l` | Label selector |
-| `--verbose` | `-v` | Full JSON output (no compact summary) |
-| `--param` | | Any TA parameter as `key=value` (repeatable); see [TA parameters](#zoa-run--ta-parameters) |
-| `--force` | | Bypass write cooldown and concurrency limits |
-| `--dry-run` | | Execute the dry-run variant of the action |
-| `--execution-mode` | | Override execution class: `sync` or `async` (default: TA's declared class) |
-| `--timeout` | | Server-side TA execution timeout (e.g. 60s, 3m; bounded by server max 295s) |
-| `--no-wait` | | Return ID immediately, skip output display |
-| `--wait` | | Poll until async execution completes (no effect on sync — sync returns inline) |
-| `--wait-timeout` | | Max poll duration when `--wait` is active (default 5m) |
-| `--wait-poll-interval` | | Poll frequency when `--wait` is active (default 30s) |
-| `--gather` | | `must_gather` scopes: `hcp`, `mc`, `rc` (comma-separated; must match the ZOA endpoint) |
-| `--cluster-id` | | Hosted cluster UUID (`must_gather` when `--gather` includes `hcp`) |
+| Flag                   | Short | Description                                                                                                                                            |
+| ---------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--reason`             |       | Reason for this run (required unless `ZOA_REASON` is set; **flag wins over env** — see [Environment variables](#environment-variables-and-precedence)) |
+| `--namespace`          | `-n`  | Target namespace                                                                                                                                       |
+| `--all-namespaces`     | `-A`  | All namespaces                                                                                                                                         |
+| `--name`               |       | Resource name                                                                                                                                          |
+| `--resource`           |       | Resource type (for generic actions)                                                                                                                    |
+| `--selector`           | `-l`  | Label selector                                                                                                                                         |
+| `--verbose`            | `-v`  | Full JSON output (no compact summary)                                                                                                                  |
+| `--param`              |       | Any TA parameter as `key=value` (repeatable); see [TA parameters](#zoa-run--ta-parameters)                                                             |
+| `--force`              |       | Bypass write cooldown and concurrency limits                                                                                                           |
+| `--dry-run`            |       | Execute the dry-run variant of the action                                                                                                              |
+| `--execution-mode`     |       | Override execution class: `sync` or `async` (default: TA's declared class)                                                                             |
+| `--timeout`            |       | Server-side TA execution timeout (e.g. 60s, 3m; bounded by server max 295s)                                                                            |
+| `--no-wait`            |       | Return ID immediately, skip output display                                                                                                             |
+| `--wait`               |       | Poll until async execution completes (no effect on sync — sync returns inline)                                                                         |
+| `--wait-timeout`       |       | Max poll duration when `--wait` is active (default 5m)                                                                                                 |
+| `--wait-poll-interval` |       | Poll frequency when `--wait` is active (default 30s)                                                                                                   |
+| `--gather`             |       | `must_gather` scopes: `hcp`, `mc`, `rc` (comma-separated; must match the ZOA endpoint)                                                                 |
+| `--cluster-id`         |       | Hosted cluster UUID (`must_gather` when `--gather` includes `hcp`)                                                                                     |
 
 #### `must_gather`
 
 **Must-gather** is the standard troubleshooting bundle: Kubernetes logs, events, and resource manifests packaged as `output.tar.gz` for offline analysis (compatible with `omc`/`omg`-style layouts).
 
-| `--gather` | Collects |
-|------------|----------|
-| `hcp` | One hosted ROSA cluster: hypershift dump + HCP/control-plane namespace diagnostics (MC ZOA only; requires `--cluster-id`) |
-| `mc` | Management cluster platform: platform namespaces (e.g. kube-applier, hypershift), nodes, storage, Karpenter CRs |
-| `rc` | Regional cluster platform: platform namespaces (e.g. platform-api), HyperFleet CRs, nodes, storage, Karpenter CRs |
+| `--gather` | Collects                                                                                                                  |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `hcp`      | One hosted ROSA cluster: hypershift dump + HCP/control-plane namespace diagnostics (MC ZOA only; requires `--cluster-id`) |
+| `mc`       | Management cluster platform: platform namespaces (e.g. kube-applier, hypershift), nodes, storage, Karpenter CRs           |
+| `rc`       | Regional cluster platform: platform namespaces (e.g. platform-api), HyperFleet CRs, nodes, storage, Karpenter CRs         |
 
 Read-only. Produces `output.tar.gz` (`zoa download`). Mode is async (see MODE column); use `--wait` to block.
 
@@ -464,63 +464,63 @@ Use `zoa describe must_gather` for parameters such as `extra_namespaces` and `sk
 
 All filters are combinable:
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--status` | | Filter by status (dispatched, succeeded, failed, timed_out) |
-| `--action` | | Filter by action name |
-| `--operator` | | Filter by operator |
-| `--target` | `-t` | Filter by target cluster |
-| `--scope` | | Filter by scope (kube-api, aws-api) |
-| `--type` | | Filter by type (read, write) |
-| `--execution-mode` | | Filter by execution class (sync, async) |
-| `--since` | | Show entries after this point (default: `24h`). See [Time Formats](#time-formats). |
-| `--until` | | Show entries before this point. See [Time Formats](#time-formats). |
-| `--dry-run` | | Show only dry-run executions |
-| `--limit` | | Max results (max 100, default 20) |
+| Flag               | Short | Description                                                                        |
+| ------------------ | ----- | ---------------------------------------------------------------------------------- |
+| `--status`         |       | Filter by status (dispatched, succeeded, failed, timed_out)                        |
+| `--action`         |       | Filter by action name                                                              |
+| `--operator`       |       | Filter by operator                                                                 |
+| `--target`         | `-t`  | Filter by target cluster                                                           |
+| `--scope`          |       | Filter by scope (kube-api, aws-api)                                                |
+| `--type`           |       | Filter by type (read, write)                                                       |
+| `--execution-mode` |       | Filter by execution class (sync, async)                                            |
+| `--since`          |       | Show entries after this point (default: `24h`). See [Time Formats](#time-formats). |
+| `--until`          |       | Show entries before this point. See [Time Formats](#time-formats).                 |
+| `--dry-run`        |       | Show only dry-run executions                                                       |
+| `--limit`          |       | Max results (max 100, default 20)                                                  |
 
 ### `get`
 
-| Flag | Description |
-|------|-------------|
-| `--include-output` | Include execution output in display |
-| `--include-logs` | Include execution logs |
-| `--include-all` | Include both output and logs |
-| `--wait` | Poll until execution reaches terminal status (useful to reconnect) |
-| `--wait-timeout` | Max poll duration when `--wait` is active (default 5m) |
-| `--wait-poll-interval` | Poll frequency when `--wait` is active (default 30s) |
+| Flag                   | Description                                                        |
+| ---------------------- | ------------------------------------------------------------------ |
+| `--include-output`     | Include execution output in display                                |
+| `--include-logs`       | Include execution logs                                             |
+| `--include-all`        | Include both output and logs                                       |
+| `--wait`               | Poll until execution reaches terminal status (useful to reconnect) |
+| `--wait-timeout`       | Max poll duration when `--wait` is active (default 5m)             |
+| `--wait-poll-interval` | Poll frequency when `--wait` is active (default 30s)               |
 
 ### `audit`
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--action` | | Filter by action name |
-| `--operator` | | Filter by operator |
-| `--target` | `-t` | Filter by target cluster |
-| `--method` | | Filter by HTTP method (GET, POST) |
-| `--approval` | | Filter by approval state |
-| `--since` | | Show entries after this point (default: `24h`). See [Time Formats](#time-formats). |
-| `--until` | | Show entries before this point. See [Time Formats](#time-formats). |
-| `--limit` | | Max results (max 200, default 50) |
+| Flag         | Short | Description                                                                        |
+| ------------ | ----- | ---------------------------------------------------------------------------------- |
+| `--action`   |       | Filter by action name                                                              |
+| `--operator` |       | Filter by operator                                                                 |
+| `--target`   | `-t`  | Filter by target cluster                                                           |
+| `--method`   |       | Filter by HTTP method (GET, POST)                                                  |
+| `--approval` |       | Filter by approval state                                                           |
+| `--since`    |       | Show entries after this point (default: `24h`). See [Time Formats](#time-formats). |
+| `--until`    |       | Show entries before this point. See [Time Formats](#time-formats).                 |
+| `--limit`    |       | Max results (max 200, default 50)                                                  |
 
-Calls `GET /api/v0/audit` on the per-VPC API Lambda (platform route, not under `/trusted-actions/`). Default table **PATH** omits `/api/v0/` and shows the route family (`trusted-actions/...`, `sessions/...`, `audit`); `-o json` includes the full stored path.
+Default table **PATH** omits `/api/v0/` and shows the route family (`trusted-actions/...`, `sessions/...`, `audit`); `-o json` includes the full stored path.
 
 ### `download`
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--file` | `-f` | Destination file path (default: `zoa-<id>-<artifact>.json`) |
-| `--artifact` | | Which artifact to download: `output` (default), `logs` |
+| Flag         | Short | Description                                                 |
+| ------------ | ----- | ----------------------------------------------------------- |
+| `--file`     | `-f`  | Destination file path (default: `zoa-<id>-<artifact>.json`) |
+| `--artifact` |       | Which artifact to download: `output` (default), `logs`      |
 
 ## Time formats
 
 Both `--since` and `--until` accept the same flexible formats:
 
-| Format | Example | Meaning |
-|--------|---------|---------|
-| Duration | `1h`, `24h`, `7d`, `30m`, `300s` | Relative to now (subtracted) |
-| Short date | `2026-08-25` | Start-of-day for `--since`, end-of-day for `--until` |
-| RFC3339 | `2026-08-25T14:30:00Z` | Exact timestamp |
-| RFC3339 with offset | `2026-08-25T16:30:00+02:00` | Exact timestamp (converted to UTC) |
+| Format              | Example                          | Meaning                                              |
+| ------------------- | -------------------------------- | ---------------------------------------------------- |
+| Duration            | `1h`, `24h`, `7d`, `30m`, `300s` | Relative to now (subtracted)                         |
+| Short date          | `2026-08-25`                     | Start-of-day for `--since`, end-of-day for `--until` |
+| RFC3339             | `2026-08-25T14:30:00Z`           | Exact timestamp                                      |
+| RFC3339 with offset | `2026-08-25T16:30:00+02:00`      | Exact timestamp (converted to UTC)                   |
 
 **Behavior notes:**
 
