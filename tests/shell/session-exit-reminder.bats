@@ -1,7 +1,11 @@
 #!/usr/bin/env bats
 
+load test-env
+
 setup() {
-  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
+  REPO_ROOT="$(zoa_shell_test_repo_root)"
+  BANNER="$(zoa_shell_test_banner_path)"
+  zoa_shell_test_export_banner
   SESSION_ID_RC="${REPO_ROOT}/boundary/home-sre/.bashrc.d/09-zoa-session-id.bashrc"
   REMINDER="${REPO_ROOT}/boundary/home-sre/.bashrc.d/99-session-exit-reminder.bashrc"
   PROMPT="${REPO_ROOT}/boundary/home-sre/.bashrc.d/10-zoa-prompt.bashrc"
@@ -36,8 +40,12 @@ setup() {
 
 @test "session terminate hint includes deployment and session id" {
   run env \
+    ZOA_BOUNDARY_BANNER="${BANNER}" \
+    ZOA_BOUNDARY_BANNER_PATH="${BANNER}" \
     ZOA_DEPLOYMENT="us-east-1-eph" \
     ZOA_SESSION_ID="sess-abc123" \
+    ZOA_SESSION_DEADLINE="2030-01-01T12:00:00Z" \
+    ZOA_SESSION_IDLE_TIMEOUT_SECONDS="3600" \
     bash -c '
       source "$1"
       source "$2"
@@ -83,6 +91,8 @@ setup() {
 
 @test "EXIT trap prints session terminate hint on shell exit" {
   run env \
+    ZOA_BOUNDARY_BANNER="${BANNER}" \
+    ZOA_BOUNDARY_BANNER_PATH="${BANNER}" \
     ZOA_DEPLOYMENT="us-east-1-eph" \
     ZOA_SESSION_ID="sess-abc123" \
     bash -c '

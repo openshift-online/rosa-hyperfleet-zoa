@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-export PATH="/usr/local/bin:/usr/local/aws-cli/v2/current/bin:/usr/bin:/bin"
+export PATH="/usr/local/bin:/usr/local/aws-cli/v2/current/bin:/usr/bin:/bin${PATH:+:${PATH}}"
 
 _zoa_boundary_banner_path="${ZOA_BOUNDARY_BANNER_PATH:-/etc/zoa-boundary/banner.sh}"
 if [[ ! -f "${_zoa_boundary_banner_path}" ]]; then
@@ -15,12 +15,17 @@ fi
 # shellcheck source=/dev/null
 source "${_zoa_boundary_banner_path}"
 
+zoa_sre_home() {
+  # ECS task sets HOME=/home/sre; tests override HOME to a writable temp dir.
+  echo "${HOME:-/home/sre}"
+}
+
 zoa_session_md_path() {
-  echo "/home/sre/.claude/ZOA_SESSION.md"
+  echo "$(zoa_sre_home)/.claude/ZOA_SESSION.md"
 }
 
 zoa_actions_catalog_path() {
-  echo "/home/sre/.claude/ZOA_ACTIONS.md"
+  echo "$(zoa_sre_home)/.claude/ZOA_ACTIONS.md"
 }
 
 zoa_target_type() {
@@ -34,7 +39,7 @@ zoa_target_type() {
 write_zoa_session_md() {
   local target_type
   target_type="$(zoa_target_type)"
-  mkdir --parents /home/sre/.claude
+  mkdir --parents "$(zoa_sre_home)/.claude"
   {
     echo "# Active ZOA Boundary session"
     echo ""
@@ -69,7 +74,7 @@ write_zoa_session_md() {
 install_actions_catalog() {
   local catalog_path
   catalog_path="$(zoa_actions_catalog_path)"
-  mkdir --parents /home/sre/.claude
+  mkdir --parents "$(zoa_sre_home)/.claude"
 
   if ! command -v zoa &>/dev/null; then
     echo "FATAL: zoa CLI not found — cannot render offline actions catalog" >&2

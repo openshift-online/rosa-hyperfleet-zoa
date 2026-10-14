@@ -1,7 +1,7 @@
 # Remind SREs to terminate the boundary session from the laptop when ECS Exec ends.
 # Does not call Access or terminate the task — exit/Ctrl+D only disconnects the shell.
 
-ZOA_BOUNDARY_BANNER="/etc/zoa-boundary/banner.sh"
+ZOA_BOUNDARY_BANNER="${ZOA_BOUNDARY_BANNER:-${ZOA_BOUNDARY_BANNER_PATH:-/etc/zoa-boundary/banner.sh}}"
 
 zoa_boundary_print_session_terminate_hint() {
   if [[ ! -f "${ZOA_BOUNDARY_BANNER}" ]]; then

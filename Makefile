@@ -1,4 +1,4 @@
-.PHONY: all build dist print-version clean install test test-e2e test-e2e-smoke \
+.PHONY: all build dist print-version clean install test test-shell test-e2e test-e2e-smoke \
        test-e2e-zoa test-e2e-zoa-smoke test-e2e-monitoring \
        fmt fmt-check vet lint verify tidy verify-mod \
        image-lambda image-runner image-boundary \
@@ -94,6 +94,13 @@ verify-mod: tidy
 
 test:
 	@go test -race -coverprofile=coverage.out ./...
+
+# Boundary shell scripts (bats-core). CI: install bats-core (e.g. dnf install bats) and run this target.
+BATS ?= bats
+test-shell: build
+	@ZOA_BOUNDARY_BANNER_PATH="$(CURDIR)/boundary/zoa-boundary-banner.sh" \
+	 ZOA_BOUNDARY_BANNER="$(CURDIR)/boundary/zoa-boundary-banner.sh" \
+	 $(BATS) tests/shell/
 
 # test-e2e drives the built zoa CLI against an already-provisioned RC and/or
 # MC environment (ZOA_RC_API_URL / ZOA_MC_API_URL). It is excluded from
@@ -248,6 +255,7 @@ help:
 	@echo ""
 	@echo "Test & Quality:"
 	@echo "  test               Run unit tests with race detection"
+	@echo "  test-shell         Run boundary shell bats tests (requires bats-core; builds zoa CLI first)"
 	@echo "  test-e2e           Run full ZOA e2e + monitoring suite (auto-parallel when both RC+MC are set)"
 	@echo "  test-e2e-smoke     Run smoke ZOA e2e + monitoring smoke (used by rosa-hyperfleet/-api)"
 	@echo "  test-e2e-zoa       Run full ZOA e2e only (no monitoring)"

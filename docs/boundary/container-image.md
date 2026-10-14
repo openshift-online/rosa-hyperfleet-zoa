@@ -52,7 +52,7 @@ Pass `VCS_REF` / `VERSION` via build-args when integrating with Konflux (see `do
 ## Tests
 
 ```bash
-make test-shell   # bats — entrypoint.sh (requires bats-core)
+make test-shell   # bats tests/shell/ (requires bats-core; builds bin/zoa first)
 ```
 Wire into CI via openshift/release (planned).
 
