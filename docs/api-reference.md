@@ -260,6 +260,12 @@ Served by the API Lambda (`HANDLER_MODE=api`) in each target VPC.
 | `GET`  | `/health`  | Health check (200 OK)                              |
 | `GET`  | `/version` | Server version, commit, build time, target cluster |
 
+### Audit
+
+| Method | Path            | Description       |
+| ------ | --------------- | ----------------- |
+| `GET`  | `/api/v0/audit` | Query audit trail |
+
 ### Trusted Actions
 
 | Method | Path                                   | Description                                  |
@@ -277,11 +283,39 @@ Served by the API Lambda (`HANDLER_MODE=api`) in each target VPC.
 | `GET`  | `/api/v0/trusted-actions/runs/{id}/output` | Download execution output (streaming) |
 | `GET`  | `/api/v0/trusted-actions/runs/{id}/logs`   | Download execution logs (streaming)   |
 
-### Audit
+---
 
-| Method | Path            | Description       |
-| ------ | --------------- | ----------------- |
-| `GET`  | `/api/v0/audit` | Query audit trail |
+## GET /api/v0/audit
+
+Query the audit trail. Records TA executions (API Lambda), session operations (Access Lambda), and read access to this endpoint.
+
+### Query Parameters
+
+| Param      | Type   | Description                                                       |
+| ---------- | ------ | ----------------------------------------------------------------- |
+| `action`   | string | Filter by action (TA name or session action like `session_start`) |
+| `operator` | string | Filter by operator                                                |
+| `limit`    | int    | Max results (default 50)                                          |
+
+### Response
+
+```json
+{
+  "items": [
+    {
+      "timestamp": "2026-08-17T10:08:38.000Z",
+      "method": "POST",
+      "path": "/api/v0/trusted-actions/list_eks_clusters/run",
+      "status_code": 202,
+      "operator": "slopezma",
+      "action": "list_eks_clusters",
+      "target_cluster": "eph-994026fc-regional",
+      "reason": "ROSAENG-1234",
+      "execution_id": "d5b57bf2-1bdb-42bf-9607-8abf47d5331c"
+    }
+  ]
+}
+```
 
 ---
 
@@ -420,40 +454,6 @@ Used by `zoa output <id>` and `zoa download <id>`.
 Stream the execution's log artifact from S3. Returns plain text.
 
 Used by `zoa logs <id>`.
-
----
-
-## GET /api/v0/audit
-
-Query the audit trail. Records TA executions (API Lambda), session operations (Access Lambda), and read access to this endpoint.
-
-### Query Parameters
-
-| Param      | Type   | Description                                                       |
-| ---------- | ------ | ----------------------------------------------------------------- |
-| `action`   | string | Filter by action (TA name or session action like `session_start`) |
-| `operator` | string | Filter by operator                                                |
-| `limit`    | int    | Max results (default 50)                                          |
-
-### Response
-
-```json
-{
-  "items": [
-    {
-      "timestamp": "2026-08-17T10:08:38.000Z",
-      "method": "POST",
-      "path": "/api/v0/trusted-actions/list_eks_clusters/run",
-      "status_code": 202,
-      "operator": "slopezma",
-      "action": "list_eks_clusters",
-      "target_cluster": "eph-994026fc-regional",
-      "reason": "ROSAENG-1234",
-      "execution_id": "d5b57bf2-1bdb-42bf-9607-8abf47d5331c"
-    }
-  ]
-}
-```
 
 ---
 
