@@ -48,6 +48,7 @@ setup() {
   [[ "${output}" != *"==> Remember"* ]]
   [[ "${output}" == *"CLAUDE.md"* ]]
   [[ "${output}" == *"ZOA_SESSION.md"* ]]
+  [[ "${output}" == *"claude --resume"* ]]
 }
 
 @test "zoa_boundary_print_session_limits includes terminate hint and renamed header" {
