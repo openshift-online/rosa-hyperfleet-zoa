@@ -20,6 +20,14 @@ Image: **`zoa-boundary`** (`Containerfile.boundary`). Published to Quay (`quay.i
 | `jq`                                     | JSON from `zoa -o json`                                                                  |
 | `claude`                                 | Bedrock (`CLAUDE_CODE_USE_BEDROCK=1`); operational assist only (not customer data store) |
 
+### Claude Code in a boundary task
+
+- **Each `claude` start is a new chat** unless you pass **`claude --resume <session-id>`** (Claude prints the resume command when you exit the CLI, e.g. `claude --resume 9c61fe5b-…`).
+- **History is local to the ECS task** under `/home/sre/.claude/` (project transcripts, settings). It **persists while the boundary task runs** (same Exec reconnect or a new `claude` in the same shell). It is **not** synced to S3 or your laptop; when the task is reaped or terminated, that history is gone.
+- **Leaving Claude without `zoa session terminate`** only ends the Claude process — the **ZOA session / ECS task keeps running** (by design). Start `claude` again anytime in that task; use **`--resume`** to continue the prior Claude thread.
+- **Bedrock mode** (`CLAUDE_CODE_USE_BEDROCK=1`): no Anthropic cloud account memory. Claude may still use **on-disk project history** for `--resume`; it will **not** automatically recall a previous chat if you run plain `claude` again.
+- **Durable context for agents**: bake guidance in `/home/sre/.claude/CLAUDE.md`, `ZOA_SESSION.md`, and `ZOA_ACTIONS.md` (refreshed at task start). For incident notes you need after teardown, copy to a ticket or use **`zoa run`** output / audit — not Claude chat alone.
+
 ## Shell
 
 - `/etc/bash_completion.d/` — `zoa`, `kubectl`, `aws`
