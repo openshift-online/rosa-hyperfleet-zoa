@@ -242,12 +242,26 @@ Use the **Platform workloads** section above for RC/MC namespace names (e.g. `pl
 
 For bundle collection, see **`must_gather`** in **`ZOA_ACTIONS.md`** (`--gather rc` on RC boundary, `mc` / `hcp` on MC).
 
+## Claude Code sessions (resume)
+
+Claude Code names each interactive run a **session** (not a ZOA boundary session). Plain **`claude`** always starts a **new** conversation. To continue a prior one **in this ECS task**:
+
+1. **`claude --resume`** (no ID) — opens the **session picker** (search and choose). Prefer this; operators rarely save the UUID.
+2. **`claude --continue`** — latest conversation for the current directory (`/home/sre`).
+3. **`claude --resume <session-id>`** — only if you copied the UUID from Claude’s exit line.
+
+Inside an active Claude Code session, **`/resume`** opens the same picker without leaving the CLI.
+
+History lives under **`/home/sre/.claude/`** on the task disk only — **not** synced to your laptop or S3. Exiting Claude does **not** end the ZOA boundary task; exiting Exec does **not** terminate the task either (see [Session lifecycle](#session-lifecycle-boundary)). When the task is reaped, Claude sessions on that task are gone.
+
+**Bedrock mode:** no Anthropic cloud memory — only on-disk session files and **`--resume`**. For durable notes, use tickets, **`zoa run`** output, or **`zoa audit`** / **`zoa runs`**, not chat alone.
+
 ## Other tools in the image
 
 | Tool                      | Notes                                                                                                         |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | **`jq`**                  | Parse `zoa -o json` output.                                                                                   |
-| **`claude`**              | **Amazon Bedrock**; **`ANTHROPIC_MODEL`** set by Terraform (Sonnet 5). Assistant only — not a bypass for TAs. |
+| **`claude`**              | **Amazon Bedrock**; **`ANTHROPIC_MODEL`** set by Terraform (Sonnet 5). Assistant only — not a bypass for TAs. See [Claude Code sessions](#claude-code-sessions-resume) below. |
 | **`aws`** / **`kubectl`** | Installed but **no default credentials**. Use after break-glass only.                                         |
 
 ## What you must not do

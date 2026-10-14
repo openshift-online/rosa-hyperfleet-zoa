@@ -103,7 +103,7 @@ On first interactive login:
 **Work:**
 
 - **`zoa run …`** — Trusted Actions (audited in DynamoDB). Output appears in the **same PTY** (Exec logs).
-- **Claude Code** — optional; uses the same shell context. Prefer driving changes through **`zoa run`**; Claude output and approvals appear in the PTY transcript.
+- **Claude Code** — optional; uses the same shell context. Prefer driving changes through **`zoa run`**; Claude output and approvals appear in the PTY transcript. Plain **`claude`** starts a new conversation; **`claude --resume`** (no args) opens a session list to continue a prior chat in the same ECS task (**`claude --continue`** for the latest). Details: [boundary container image — Claude Code](../boundary/container-image.md#claude-code-in-a-boundary-task) and **`~/.claude/CLAUDE.md`** in the image.
 
 ### 6. Leave the shell vs end the session
 
