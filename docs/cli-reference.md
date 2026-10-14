@@ -139,8 +139,8 @@ These apply to **every** subcommand (`session`, `run`, `runs`, `audit`, …). Wh
 
 | Command | Description |
 |---------|-------------|
-| `deployments` | List ZOA deployments registered in SSM |
-| `targets <deployment>` | List targets (RC + MC) for a deployment |
+| `deployments` | List ZOA deployments registered in SSM (default table: deployment + region; `-o wide` / `-o json` for full metadata) |
+| `targets <deployment>` | List targets (RC + MC) for a deployment (default: target, region, type, status; `-o wide` / `-o json` for VPC, subnets, ECS, API URL, etc.) |
 
 ### Boundary sessions (laptop — Access Lambda)
 

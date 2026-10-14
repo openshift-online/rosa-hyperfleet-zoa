@@ -394,6 +394,51 @@ func TestClientDoV0_WhenLambdaRuntimeErrorOn200_ItShouldReturnLambdaError(t *tes
 	}
 }
 
+func TestClient_ListTargets_WhenAccessReturnsFullTargetMetadata_ItShouldDecodeAllFields(t *testing.T) {
+	body := `{
+		"count": 1,
+		"items": [{
+			"target_id": "eph-mc01",
+			"deployment_name": "us-east-1-eph",
+			"target_type": "mc",
+			"region": "us-east-1",
+			"status": "ready",
+			"vpc_id": "vpc-abc",
+			"subnet_ids": "subnet-a,subnet-b",
+			"security_group_id": "sg-1",
+			"ecs_cluster_arn": "arn:aws:ecs:us-east-1:123:cluster/c",
+			"task_definition_arn": "arn:aws:ecs:us-east-1:123:task-definition/td:1",
+			"function_url": "https://api.lambda-url.on.aws/",
+			"account_id": "855246887846"
+		}]
+	}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v0/targets" {
+			t.Fatalf("path = %q, want /api/v0/targets", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	c := &Client{baseURL: server.URL, region: "us-east-1", sigService: "lambda", credentials: staticCredentials{}, httpClient: http.DefaultClient}
+	list, err := c.ListTargets(context.Background())
+	if err != nil {
+		t.Fatalf("ListTargets: %v", err)
+	}
+	if len(list.Items) != 1 {
+		t.Fatalf("expected 1 target, got %d", len(list.Items))
+	}
+	got := list.Items[0]
+	if got.SubnetIds != "subnet-a,subnet-b" || got.SecurityGroupId != "sg-1" {
+		t.Errorf("subnet/sg: subnets=%q sg=%q", got.SubnetIds, got.SecurityGroupId)
+	}
+	if got.EcsClusterArn == "" || got.TaskDefinitionArn == "" || got.FunctionUrl == "" {
+		t.Errorf("expected ECS and function_url fields set, got cluster=%q taskDef=%q url=%q",
+			got.EcsClusterArn, got.TaskDefinitionArn, got.FunctionUrl)
+	}
+}
+
 func TestClientDo_WhenLambdaRuntimeError_ItShouldReturnLambdaError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)

@@ -196,7 +196,7 @@ func (h *AccessHandler) handleSessionStart(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Look up target from DynamoDB for VPC/subnet/task definition info
+	// Look up target from SSM (target registry) for VPC/subnet/task definition info
 	target, err := h.targetStore.Get(ctx, req.Target)
 	if err != nil {
 		h.logger.Error("failed to get target", "target", req.Target, "error", err)

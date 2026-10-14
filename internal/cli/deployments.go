@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -40,9 +41,15 @@ Uses your active AWS credentials (Central Account). No Access Lambda
 or invoker role needed — this is a direct SSM read.
 
 Each deployment is one regional ZOA installation. Use the DEPLOYMENT
-values from this list with zoa targets and zoa session.`,
+values from this list with zoa targets and zoa session.
+
+Default table shows DEPLOYMENT and REGION only (safe to paste). Use -o wide
+for account ID, Access URL, and invoker role; use -o json for automation.`,
 		Example: `  # List all deployments
   zoa deployments
+
+  # Full columns (URLs, ARNs, account) for scripts or troubleshooting
+  zoa deployments -o wide
 
   # JSON output
   zoa deployments -o json`,
@@ -70,20 +77,34 @@ values from this list with zoa targets and zoa session.`,
 				return nil
 			}
 
-			tw := output.NewTable(os.Stdout)
-			fmt.Fprintln(tw, "DEPLOYMENT\tREGION\tACCESS URL\tINVOKER ROLE")
-			for _, d := range deployments {
-				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
-					d.DeploymentName,
-					output.Dash(d.Region),
-					output.Dash(d.AccessURL),
-					output.Dash(d.InvokerRoleARN))
-			}
-			return tw.Flush()
+			return printDeploymentsTable(os.Stdout, opts, deployments)
 		},
 	}
 
 	return cmd
+}
+
+func printDeploymentsTable(w io.Writer, opts *GlobalOptions, deployments []ssmDeployment) error {
+	wide := opts.OutputFormat == output.FormatWide
+	tw := output.NewTable(w)
+	if wide {
+		fmt.Fprintln(tw, "DEPLOYMENT\tREGION\tACCOUNT ID\tACCESS URL\tINVOKER ROLE")
+	} else {
+		fmt.Fprintln(tw, "DEPLOYMENT\tREGION")
+	}
+	for _, d := range deployments {
+		if wide {
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+				d.DeploymentName,
+				output.Dash(d.Region),
+				output.Dash(d.AccountID),
+				output.Dash(d.AccessURL),
+				output.Dash(d.InvokerRoleARN))
+			continue
+		}
+		fmt.Fprintf(tw, "%s\t%s\n", d.DeploymentName, output.Dash(d.Region))
+	}
+	return tw.Flush()
 }
 
 // listDeploymentsFromSSM reads /zoa/deployments from SSM Parameter Store

@@ -256,14 +256,18 @@ func (e *LambdaRuntimeError) IsUnavailable() bool {
 // --- Access / Boundary types ---
 
 type Target struct {
-	TargetID       string `json:"target_id"`
-	DeploymentName string `json:"deployment_name"`
-	VpcId          string `json:"vpc_id,omitempty"`
-	AccountId      string `json:"account_id,omitempty"`
-	TargetType     string `json:"target_type"`
-	Region         string `json:"region"`
-	Status         string `json:"status,omitempty"`
-	FunctionUrl    string `json:"function_url,omitempty"`
+	TargetID          string `json:"target_id"`
+	DeploymentName    string `json:"deployment_name"`
+	VpcId             string `json:"vpc_id,omitempty"`
+	SubnetIds         string `json:"subnet_ids,omitempty"`
+	SecurityGroupId   string `json:"security_group_id,omitempty"`
+	EcsClusterArn     string `json:"ecs_cluster_arn,omitempty"`
+	TaskDefinitionArn string `json:"task_definition_arn,omitempty"`
+	AccountId         string `json:"account_id,omitempty"`
+	TargetType        string `json:"target_type"`
+	Region            string `json:"region"`
+	Status            string `json:"status,omitempty"`
+	FunctionUrl       string `json:"function_url,omitempty"`
 }
 
 type TargetList struct {
