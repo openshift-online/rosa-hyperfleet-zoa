@@ -244,7 +244,7 @@ func (h *AccessHandler) handleSessionStart(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	h.recordAccessAudit(r, http.StatusOK, "session_start", sessionID, reasonValue)
+	h.recordAccessAudit(r, http.StatusOK, "session_start", sessionID, reasonValue, req.Target)
 
 	writeJSON(w, http.StatusOK, sessionStartResponse{
 		SessionID: sessionID,
@@ -395,7 +395,7 @@ func (h *AccessHandler) handleSessionList(w http.ResponseWriter, r *http.Request
 
 	// Audit cross-operator queries (session history) but not self-service list (scope=mine).
 	if q.Get("scope") != "mine" {
-		h.recordAccessAudit(r, http.StatusOK, "session_history", "", "")
+		h.recordAccessAudit(r, http.StatusOK, "session_history", "", "", q.Get("target"))
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{"items": sessions, "count": len(sessions)})
@@ -467,7 +467,7 @@ func (h *AccessHandler) handleSessionTerminate(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	h.recordAccessAudit(r, http.StatusOK, "session_terminate", sessionID, session.Reason)
+	h.recordAccessAudit(r, http.StatusOK, "session_terminate", sessionID, session.Reason, session.TargetCluster)
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "terminated", "session_id": sessionID})
 }
@@ -562,7 +562,7 @@ func (h *AccessHandler) handleSessionJoin(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	h.recordAccessAudit(r, http.StatusOK, "session_join", sessionID, session.Reason)
+	h.recordAccessAudit(r, http.StatusOK, "session_join", sessionID, session.Reason, session.TargetCluster)
 
 	writeJSON(w, http.StatusOK, sessionJoinResponse{
 		SessionID:       sessionID,
@@ -634,7 +634,7 @@ func (h *AccessHandler) handleSessionExecAttached(w http.ResponseWriter, r *http
 		return
 	}
 
-	h.recordAccessAudit(r, http.StatusOK, "session_exec_attached", sessionID, session.Reason)
+	h.recordAccessAudit(r, http.StatusOK, "session_exec_attached", sessionID, session.Reason, session.TargetCluster)
 
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status":          "ok",
@@ -657,17 +657,17 @@ func (h *AccessHandler) handleTargetList(w http.ResponseWriter, r *http.Request)
 
 func (h *AccessHandler) handleApproveStub(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	h.recordAccessAudit(r, http.StatusNotImplemented, "approve", id, "")
+	h.recordAccessAudit(r, http.StatusNotImplemented, "approve", id, "", "")
 	writeError(w, http.StatusNotImplemented, "not_implemented", "approval workflow not yet enabled")
 }
 
 func (h *AccessHandler) handleRejectStub(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	h.recordAccessAudit(r, http.StatusNotImplemented, "reject", id, "")
+	h.recordAccessAudit(r, http.StatusNotImplemented, "reject", id, "", "")
 	writeError(w, http.StatusNotImplemented, "not_implemented", "approval workflow not yet enabled")
 }
 
-func (h *AccessHandler) recordAccessAudit(r *http.Request, statusCode int, action, sessionID, reasonValue string) {
+func (h *AccessHandler) recordAccessAudit(r *http.Request, statusCode int, action, sessionID, reasonValue, targetCluster string) {
 	if h.auditStore == nil {
 		return
 	}
@@ -684,20 +684,21 @@ func (h *AccessHandler) recordAccessAudit(r *http.Request, statusCode int, actio
 	}
 	accountID := r.Header.Get("X-Account-ID")
 	entry := &store.AuditEntry{
-		AccountID:   accountID,
-		Timestamp:   time.Now().Format(time.RFC3339Nano),
-		Method:      r.Method,
-		Path:        r.URL.Path,
-		StatusCode:  statusCode,
-		Operator:    operator,
-		SignerARN:   signerARN,
-		SessionID:   auditSessionID,
-		Action:      action,
-		SourceIP:    r.Header.Get("X-Source-IP"),
-		RequestID:   r.Header.Get("X-Request-ID"),
-		UserAgent:   r.Header.Get("User-Agent"),
-		ExecutionID: sessionID,
-		Reason:      reasonValue,
+		AccountID:     accountID,
+		Timestamp:     time.Now().Format(time.RFC3339Nano),
+		Method:        r.Method,
+		Path:          r.URL.Path,
+		StatusCode:    statusCode,
+		Operator:      operator,
+		SignerARN:     signerARN,
+		SessionID:     auditSessionID,
+		Action:        action,
+		TargetCluster: targetCluster,
+		SourceIP:      r.Header.Get("X-Source-IP"),
+		RequestID:     r.Header.Get("X-Request-ID"),
+		UserAgent:     r.Header.Get("User-Agent"),
+		ExecutionID:   sessionID,
+		Reason:        reasonValue,
 	}
 	if err := h.auditStore.Record(r.Context(), entry); err != nil {
 		h.logger.Error("failed to record audit entry", "error", err)

@@ -193,7 +193,7 @@ Single config source; no duplicate literals in `main.tf`.
 | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
 | Refactor `ResolveIdentity`: bridge first (`GetByTaskID`), fallback extract; **remove role-name gate** | `pkg/api/identity.go`, tests                      |
 | Document algorithm in code → link this file                                                           | `identity.go`, `router.go`, `dispatch.go`         |
-| Access `recordAccessAudit` aligned (done)                                                             | `pkg/api/access.go`                               |
+| Access `recordAccessAudit` sets `targetCluster` (session + history filter)                              | `pkg/api/access.go`                               |
 | Session start: set **`account_id`** and **`signer_arn`** (Dynamo `signerARN`, same as executions)     | `pkg/store/session.go`, `access.go`, client types |
 | CLI: `session list` default `--since 24h`                                                             | `internal/cli/session.go`                         |
 

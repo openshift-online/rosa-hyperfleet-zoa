@@ -982,3 +982,42 @@ func (m *mockECSAccessError) RunTask(_ context.Context, _ *RunTaskInput) (*RunTa
 func (m *mockECSAccessError) StopTask(_ context.Context, _ *StopTaskInput) error {
 	return m.stopErr
 }
+
+type accessAuditCapture struct {
+	last *store.AuditEntry
+}
+
+func (c *accessAuditCapture) Record(_ context.Context, e *store.AuditEntry) error {
+	c.last = e
+	return nil
+}
+
+func (c *accessAuditCapture) List(_ context.Context, _ string, _ *store.AuditFilter) ([]*store.AuditEntry, error) {
+	return nil, nil
+}
+
+func (c *accessAuditCapture) ListAll(_ context.Context, _ *store.AuditFilter) ([]*store.AuditEntry, error) {
+	return nil, nil
+}
+
+func TestWhenRecordingAccessAuditItShouldSetTargetCluster(t *testing.T) {
+	capture := &accessAuditCapture{}
+	h := &AccessHandler{
+		logger:     slog.Default(),
+		auditStore: capture,
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/v0/sessions/start", nil)
+	req.Header.Set("X-Operator", "arn:aws:sts::123:assumed-role/sre/slopezma")
+
+	h.recordAccessAudit(req, http.StatusOK, "session_start", "sess-1", "RE-1", "eph-fb3672ae-mc01")
+
+	if capture.last == nil {
+		t.Fatal("expected audit entry")
+	}
+	if capture.last.TargetCluster != "eph-fb3672ae-mc01" {
+		t.Fatalf("targetCluster: got %q", capture.last.TargetCluster)
+	}
+	if capture.last.Action != "session_start" {
+		t.Fatalf("action: got %q", capture.last.Action)
+	}
+}
