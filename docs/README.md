@@ -23,7 +23,7 @@ The boundary is the shell. Everything else happens inside it.
 | [Session logging](design/boundary-session-logging.md) | CloudWatch: container logs vs ECS Exec transcript |
 | [Session reaper](design/boundary-session-reaper.md) | Hard deadline + inactivity termination |
 | [Identity and storage](design/boundary-identity-and-storage.md) | Identity bridge (task ARN → session → operator), DynamoDB schema |
-| [ZOA deployment discovery](design/zoa-deployment-discovery.md) | Central SSM `/zoa/deployments`, failover, `--deployments-region`, direct Access |
+| [ZOA deployment discovery](design/deployments-discovery.md) | Central SSM `/zoa/deployments`, failover, `--deployments-region`, direct Access |
 
 ## Trusted Actions
 

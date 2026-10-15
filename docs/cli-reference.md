@@ -97,7 +97,7 @@ Inside the boundary, `ZOA_API_URL` points to the **API Lambda** in the target VP
 
 Normal use: **`zoa deployments`**, **`zoa targets <deployment>`**, **`zoa session …`** with **no** discovery flags. The CLI loads deployment metadata from Central SSM with **automatic failover**: **`us-east-1` first**, then **`eu-west-1`** if the first read errors.
 
-To use **one** Central region only (no failover), add **`--deployments-region <aws-region>`** on `deployments`, `targets`, and `session`. **`--access-url`** + **`--invoker-role-arn`** on `targets` and `session` only skip Central deployment SSM autodiscovery (URL and ARN required in advance). See [ZOA deployment discovery](design/zoa-deployment-discovery.md).
+To use **one** Central region only (no failover), add **`--deployments-region <aws-region>`** on `deployments`, `targets`, and `session`. **`--access-url`** + **`--invoker-role-arn`** on `targets` and `session` only skip Central deployment SSM autodiscovery (URL and ARN required in advance). See [ZOA deployment discovery](design/deployments-discovery.md).
 
 ### Manual override (API Lambda — Trusted Actions only)
 
@@ -241,7 +241,7 @@ zoa session history us-east-1 --status terminated --since 7d
 zoa session history us-east-1 -o json
 ```
 
-DR flags (`--deployments-region`, `--access-url`, `--invoker-role-arn`): see [ZOA deployment discovery](design/zoa-deployment-discovery.md).
+DR flags (`--deployments-region`, `--access-url`, `--invoker-role-arn`): see [ZOA deployment discovery](design/deployments-discovery.md).
 
 ### Trusted Action examples
 

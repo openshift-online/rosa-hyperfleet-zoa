@@ -31,7 +31,7 @@ Reads **`/zoa/deployments/`** in the **Central account** (primary SSM region **`
 
 Each **regional pipeline** registers its deployment when ZOA is provisioned. Entries are **removed when that regional deployment is destroyed**.
 
-Optional discovery flags (pin SSM region, direct Access URL) are documented in [ZOA deployment discovery](../design/zoa-deployment-discovery.md); you do not need them for the usual `deployments` → `targets` → `session start` flow.
+Optional discovery flags (pin SSM region, direct Access URL) are documented in [ZOA deployment discovery](../design/deployments-discovery.md); you do not need them for the usual `deployments` → `targets` → `session start` flow.
 
 ### 3. Discover targets (Access Lambda + RC SSM)
 

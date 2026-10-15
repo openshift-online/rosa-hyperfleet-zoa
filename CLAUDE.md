@@ -47,6 +47,7 @@ Start at **`docs/README.md`**. Do not duplicate long architecture in agent promp
 | Operator workflow | `docs/guides/operator-workflow.md` |
 | Boundary | `docs/boundary/architecture.md`, `docs/boundary/container-image.md` |
 | Session design | `docs/design/boundary-identity-and-storage.md`, `docs/design/boundary-session-reaper.md`, `docs/design/boundary-session-logging.md` |
+| Laptop deployment discovery | `docs/design/deployments-discovery.md` |
 | Lambda model | `docs/architecture/lambda-model.md`, `docs/architecture/implementation.md` |
 | API / CLI | `docs/api-reference.md`, `docs/cli-reference.md` |
 | TAs | `docs/trusted-actions.md` |
