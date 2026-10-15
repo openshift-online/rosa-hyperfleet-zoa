@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,6 +20,7 @@ import (
 
 type createRequest struct {
 	Reason         string            `json:"reason"`
+	Jira           string            `json:"jira"` // deprecated alias; see coalesceReason (ROSAENG-60291)
 	Params         map[string]string `json:"params,omitempty"`
 	Force          bool              `json:"force"`
 	DryRun         bool              `json:"dry_run"`
@@ -69,16 +71,19 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request, actionNam
 		return
 	}
 
-	if _, err := reason.Require(req.Reason); err != nil {
-		h.recordAudit(r, http.StatusBadRequest, actionName, "", withReason(req.Reason), withForce(req.Force), withDryRun(req.DryRun))
+	reasonRaw := coalesceReason(req.Reason, req.Jira)
+	reasonValue, err := reason.Require(reasonRaw)
+	if err != nil {
+		h.recordAudit(r, http.StatusBadRequest, actionName, "", withReason(reasonRaw), withForce(req.Force), withDryRun(req.DryRun))
 		metrics.EmitRejection(h.cfg.TargetCluster, metrics.RejectionValidationFailed)
 		code := "missing_reason"
-		if req.Reason != "" {
+		if strings.TrimSpace(reasonRaw) != "" {
 			code = "invalid_reason"
 		}
 		writeError(w, http.StatusBadRequest, code, err.Error())
 		return
 	}
+	req.Reason = reasonValue
 
 	meta := action.Metadata()
 
