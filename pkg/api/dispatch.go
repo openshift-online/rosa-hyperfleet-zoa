@@ -77,10 +77,16 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request, actionNam
 		h.recordAudit(r, http.StatusBadRequest, actionName, "", withReason(reasonRaw), withForce(req.Force), withDryRun(req.DryRun))
 		metrics.EmitRejection(h.cfg.TargetCluster, metrics.RejectionValidationFailed)
 		code := "missing_reason"
+		msg := err.Error()
 		if strings.TrimSpace(reasonRaw) != "" {
 			code = "invalid_reason"
+			// Legacy main-branch CLI sends {"jira":...} only; e2e still expects PROJECT-123 (ROSAENG-60291).
+			if strings.TrimSpace(req.Reason) == "" && strings.TrimSpace(req.Jira) != "" {
+				code = "invalid_jira"
+				msg = fmt.Sprintf("jira ticket %q must match format PROJECT-123", req.Jira)
+			}
 		}
-		writeError(w, http.StatusBadRequest, code, err.Error())
+		writeError(w, http.StatusBadRequest, code, msg)
 		return
 	}
 	req.Reason = reasonValue

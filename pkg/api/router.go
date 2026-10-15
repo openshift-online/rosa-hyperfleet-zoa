@@ -118,12 +118,13 @@ func (h *Handler) registerRoutes() {
 	h.mux.HandleFunc("GET "+PathTrustedActionsRuns+"/{id}", h.handleGetExecutionRoute)
 	h.mux.HandleFunc("GET "+PathTrustedActionsRuns, h.handleListExecutions)
 
+	// Audit (canonical path + legacy URL for older zoa CLI — must register before /{action})
+	h.mux.HandleFunc("GET "+PathAudit, h.handleAudit)
+	h.mux.HandleFunc("GET "+PathLegacyAudit, h.handleAudit)
+
 	// TA metadata
 	h.mux.HandleFunc("GET "+PathTrustedActions+"/{action}", h.handleDescribeActionRoute)
 	h.mux.HandleFunc("GET "+PathTrustedActions, h.handleListActions)
-
-	// Audit
-	h.mux.HandleFunc("GET "+PathAudit, h.handleAudit)
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

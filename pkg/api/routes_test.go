@@ -477,13 +477,13 @@ func TestHandleAudit_WhenCalled_ItShouldRecordAudit(t *testing.T) {
 	}
 }
 
-func TestHandleAudit_WhenLegacyTrustedActionsAuditPath_ItShouldReturn404(t *testing.T) {
+func TestHandleAudit_WhenLegacyTrustedActionsAuditPath_ItShouldReturnAuditList(t *testing.T) {
 	h := testHandlerWithAudit(&mockExecStore{}, &mockAuditStoreWithData{})
 
-	rr := doRequest(h, "GET", "/api/v0/trusted-actions/audit", nil, defaultHeaders())
+	rr := doRequest(h, "GET", PathLegacyAudit, nil, defaultHeaders())
 
-	if rr.Code != http.StatusNotFound {
-		t.Errorf("expected 404 for legacy audit path, got %d: %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200 for legacy audit path, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
