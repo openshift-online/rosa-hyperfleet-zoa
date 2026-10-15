@@ -97,8 +97,8 @@ Start a new boundary session.
 
 ```json
 {
-  "deployment_name": "us-east-1-eph-fb3672ae",
-  "target": "eph-fb3672ae-regional",
+  "deployment_name": "us-east-1",
+  "target": "regional",
   "reason": "ROSAENG-1234",
   "timeout_hours": 4
 }
@@ -115,9 +115,9 @@ Start a new boundary session.
 
 ```json
 {
-  "session_id": "db4baeeb-c818-4c85-8cb7-fd07d15b9aac",
+  "session_id": "1989937d-0889-485d-b64e-facee9e0150d",
   "status": "creating",
-  "target": "eph-fb3672ae-regional",
+  "target": "regional",
   "deadline": "2026-10-13T19:27:40.603274166Z",
   "region": "us-east-1"
 }
@@ -159,9 +159,9 @@ List sessions. Used by both `zoa session list` (own sessions) and `zoa session h
 {
   "items": [
     {
-      "sessionId": "db4baeeb-c818-4c85-8cb7-fd07d15b9aac",
+      "sessionId": "1989937d-0889-485d-b64e-facee9e0150d",
       "operator": "slopezma",
-      "targetCluster": "eph-fb3672ae-regional",
+      "targetCluster": "regional",
       "reason": "ROSA-123567",
       "status": "terminated",
       "stopReason": "idleReaperStop",
@@ -201,8 +201,8 @@ Join a session. Provisions the boundary ECS task if not already running (status=
 ```json
 {
   "session_id": "db4baeeb-c818-4c85-8cb7-fd07d15b9aac",
-  "cluster": "arn:aws:ecs:us-east-1:123456789012:cluster/eph-fb3672ae-regional-zoa-boundary",
-  "task_arn": "arn:aws:ecs:us-east-1:123456789012:task/eph-fb3672ae-regional-zoa-boundary/abc123",
+  "cluster": "arn:aws:ecs:us-east-1:123456789012:cluster/us-east-1-zoa-boundary",
+  "task_arn": "arn:aws:ecs:us-east-1:123456789012:task/us-east-1-zoa-boundary/abc123",
   "region": "us-east-1",
   "container_name": "zoa-boundary",
   "exec_command": "runuser -u sre -- /bin/bash -l",
@@ -337,7 +337,7 @@ The `action` field is a **stable event type** for filtering (`zoa audit --action
       "status_code": 202,
       "operator": "slopezma",
       "action": "list_eks_clusters",
-      "target_cluster": "eph-994026fc-regional",
+      "target_cluster": "regional",
       "reason": "ROSAENG-1234",
       "execution_id": "d5b57bf2-1bdb-42bf-9607-8abf47d5331c"
     }
@@ -382,7 +382,7 @@ Execute a Trusted Action. Called from inside the boundary via `zoa run`.
 {
   "id": "601a65eb-48bb-4afd-b290-1577be5b1812",
   "status": "succeeded",
-  "target": "eph-994026fc-regional",
+  "target": "regional",
   "executed_action": "get_resource",
   "execution_mode": "sync"
 }
@@ -394,7 +394,7 @@ Execute a Trusted Action. Called from inside the boundary via `zoa run`.
 {
   "id": "adb1e392-fb6e-4b0e-a05e-dae54c1ac835",
   "status": "dispatched",
-  "target": "eph-994026fc-regional",
+  "target": "regional",
   "executed_action": "get_resource",
   "execution_mode": "async"
 }
@@ -425,7 +425,7 @@ Get execution details.
 {
   "id": "601a65eb-48bb-4afd-b290-1577be5b1812",
   "action": "get_resource",
-  "target_cluster": "eph-994026fc-regional",
+  "target_cluster": "regional",
   "status": "succeeded",
   "execution_mode": "sync",
   "scope": "kube-api",

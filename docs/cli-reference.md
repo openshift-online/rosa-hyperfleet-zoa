@@ -78,11 +78,11 @@ The CLI talks to **two different Lambdas** depending on the command. No manual U
 ```bash
 # No env vars needed — autodiscovery via SSM
 zoa deployments                    # reads /zoa/deployments/* from Central SSM
-zoa targets us-east-1-eph-fb3672ae  # resolves Access Lambda URL from SSM
-zoa session start ...               # assumes invoker role, calls Access Lambda
+zoa targets us-east-1              # resolves Access Lambda URL from SSM
+zoa session start us-east-1 regional --reason ROSAENG-1234
 ```
 
-Use your normal **Jump/Central** AWS login (same default credential chain as `aws` CLI). ZOA reads `/zoa/deployments/<name>` from SSM and assumes the Access **invoker** role transparently. ECS Exec uses **scoped credentials** returned on `session join` — not deployment-account admin roles.
+Use your normal **Jump/Central** AWS login (same default credential chain as `aws` CLI). ZOA reads `/zoa/deployments/<name>` from **Central account SSM** (default: **`us-east-1`**, then **`eu-west-1`** if the first read fails; no `[default] region` or `AWS_REGION` required for discovery). It assumes the Access **invoker** role and calls the Access Lambda. **Target** metadata (`/zoa/targets/...`) is read by that Lambda in the deployment’s AWS region (RC account), not from your laptop. ECS Exec uses **scoped credentials** returned on `session join` — not deployment-account admin roles.
 
 ### Boundary (Trusted Actions)
 
@@ -93,13 +93,19 @@ zoa run get_resource --reason ROSAENG-1234 --resource pods
 
 Inside the boundary, `ZOA_API_URL` points to the **API Lambda** in the target VPC. **`ZOA_TARGET_TYPE`** (`rc` or `mc`) is injected when the session task starts (and is already set on the API Lambda in Terraform). Operators do not configure either.
 
-### Manual override
+### Deployment discovery (usually no flags)
 
-If you need to point at a specific Lambda directly (testing, development):
+Normal use: **`zoa deployments`**, **`zoa targets <deployment>`**, **`zoa session …`** with **no** discovery flags. The CLI loads deployment metadata from Central SSM with **automatic failover**: **`us-east-1` first**, then **`eu-west-1`** if the first read errors.
+
+To use **one** Central region only (no failover), add **`--deployments-region <aws-region>`** on `deployments`, `targets`, and `session`. **`--access-url`** + **`--invoker-role-arn`** on `targets` and `session` only skip Central deployment SSM autodiscovery (URL and ARN required in advance). See [ZOA deployment discovery](design/zoa-deployment-discovery.md).
+
+### Manual override (API Lambda — Trusted Actions only)
 
 ```bash
 export ZOA_API_URL="https://<id>.lambda-url.<region>.on.aws"
 ```
+
+Do **not** use `ZOA_API_URL` for session discovery—that is the **API** plane inside the boundary.
 
 **Identity (invoker vs Exec vs task role, identity bridge):** see [Operator workflow — Identity and SigV4](guides/operator-workflow.md#identity-and-sigv4).
 
@@ -126,12 +132,15 @@ export ZOA_API_URL="https://<id>.lambda-url.<region>.on.aws"
 
 These apply to **every** subcommand (`session`, `run`, `runs`, `audit`, …). When a flag and an env var set the same value, the **flag wins** (see [Environment variables and precedence](#environment-variables-and-precedence) for `ZOA_API_URL`, `AWS_REGION`, `ZOA_REASON`, and `ZOA_TARGET_TYPE`).
 
-| Flag        | Short | Env var       | Description                                                                                                         |
-| ----------- | ----- | ------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `--api-url` |       | `ZOA_API_URL` | ZOA endpoint (Function URL or CNAME). Session/discovery commands use SSM autodiscovery instead unless you override. |
-| `--output`  | `-o`  |               | `table` (default), `wide`, or `json`                                                                                |
-| `--region`  |       | `AWS_REGION`  | AWS region for SigV4 and custom endpoints                                                                           |
-| `--help`    | `-h`  |               | Help for the current command                                                                                        |
+| Flag                 | Short | Env var       | Description                                                                                              |
+| -------------------- | ----- | ------------- | -------------------------------------------------------------------------------------------------------- |
+| `--api-url`          |       | `ZOA_API_URL` | **API** Lambda URL (Trusted Actions). Not used for session/discovery.                                  |
+| `--deployments-region` |     | _(none)_      | Central SSM region for `/zoa/deployments` (`deployments`, `targets`, `session`; default: failover `us-east-1` → `eu-west-1`). |
+| `--access-url`       |       | _(none)_      | Direct Access URL (`targets`, `session` only); requires `--invoker-role-arn`; skips Central deployment SSM autodiscovery. |
+| `--invoker-role-arn` |       | _(none)_      | Direct Access invoker role (`targets`, `session` only); requires `--access-url`.                      |
+| `--output`           | `-o`  |               | `table` (default), `wide`, or `json`                                                                     |
+| `--region`           |       | `AWS_REGION`  | AWS region for SigV4 and custom endpoints                                                                |
+| `--help`             | `-h`  |               | Help for the current command                                                                             |
 
 ## Commands
 
@@ -139,7 +148,7 @@ These apply to **every** subcommand (`session`, `run`, `runs`, `audit`, …). Wh
 
 | Command                | Description                                                                                                                                 |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `deployments`          | List ZOA deployments registered in SSM (default table: deployment + region; `-o wide` / `-o json` for full metadata)                        |
+| `deployments`          | List deployments from Central SSM `us-east-1` (default: deployment, region, Access URL, invoker; `-o wide` adds account ID; `-o json`)     |
 | `targets <deployment>` | List targets (RC + MC) for a deployment (default: target, region, type, status; `-o wide` / `-o json` for VPC, subnets, ECS, API URL, etc.) |
 
 ### Boundary sessions (laptop — Access Lambda)
@@ -206,31 +215,33 @@ The **live API** (`zoa actions` without `--offline`) is the authoritative source
 ```bash
 # Discover deployments and targets
 zoa deployments
-zoa targets us-east-1-eph-fb3672ae
+zoa targets us-east-1
 
 # Start a boundary session (opens ECS Exec shell)
-zoa session start us-east-1-eph-fb3672ae eph-fb3672ae-regional --reason ROSAENG-1234
+zoa session start us-east-1 regional --reason ROSAENG-1234
 
 # Start without connecting (metadata only, attach later)
-zoa session start us-east-1-eph-fb3672ae eph-fb3672ae-mc01 --reason ROSAENG-1234 --no-connect
+zoa session start us-east-1 mc01 --reason ROSAENG-1234 --no-connect
 
 # List your sessions
-zoa session list us-east-1-eph-fb3672ae
-zoa session list us-east-1-eph-fb3672ae --status active
-zoa session list us-east-1-eph-fb3672ae --since 7d
+zoa session list us-east-1
+zoa session list us-east-1 --status active
+zoa session list us-east-1 -t regional
 
 # Re-join an existing session
-zoa session join us-east-1-eph-fb3672ae/db4baeeb-c818-4c85-8cb7-fd07d15b9aac
+zoa session join us-east-1/1989937d-0889-485d-b64e-facee9e0150d
 
 # Terminate a session
-zoa session terminate us-east-1-eph-fb3672ae/db4baeeb-c818-4c85-8cb7-fd07d15b9aac
+zoa session terminate us-east-1/1989937d-0889-485d-b64e-facee9e0150d
 
 # View session history across all operators
-zoa session history us-east-1-eph-fb3672ae
-zoa session history us-east-1-eph-fb3672ae --operator slopezma --since 7d
-zoa session history us-east-1-eph-fb3672ae --status terminated --since 7d
-zoa session history us-east-1-eph-fb3672ae -o json
+zoa session history us-east-1
+zoa session history us-east-1 --operator slopezma --since 7d
+zoa session history us-east-1 --status terminated --since 7d
+zoa session history us-east-1 -o json
 ```
+
+DR flags (`--deployments-region`, `--access-url`, `--invoker-role-arn`): see [ZOA deployment discovery](design/zoa-deployment-discovery.md).
 
 ### Trusted Action examples
 

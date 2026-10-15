@@ -8,9 +8,9 @@ import (
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
+
+	"github.com/openshift-online/rosa-hyperfleet-zoa/internal/accessclient"
 	"github.com/spf13/cobra"
 
 	"github.com/openshift-online/rosa-hyperfleet-zoa/internal/output"
@@ -35,27 +35,32 @@ func newDeploymentsCommand(opts *GlobalOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "deployments",
 		Short: "List available ZOA deployments",
-		Long: `List all ZOA deployments by reading SSM Parameter Store directly.
+		Long: `List all ZOA deployments by reading SSM Parameter Store in the Central account.
 
-Uses your active AWS credentials (Central Account). No Access Lambda
-or invoker role needed — this is a direct SSM read.
+No Access Lambda or invoker role — direct SSM only. Does not support
+--access-url or --invoker-role-arn.
 
-Each deployment is one regional ZOA installation. Use the DEPLOYMENT
-values from this list with zoa targets and zoa session.
+By default SSM is read in us-east-1; if that fails, the CLI retries eu-west-1.
+Pass --deployments-region to use one region only (no automatic failover).
 
-Default table shows DEPLOYMENT and REGION only (safe to paste). Use -o wide
-for account ID, Access URL, and invoker role; use -o json for automation.`,
-		Example: `  # List all deployments
-  zoa deployments
+Use DEPLOYMENT names from this table with zoa targets and zoa session.
+The default table includes Access URL and invoker role; -o wide adds account ID.`,
+		Example: `  zoa deployments
 
-  # Full columns (URLs, ARNs, account) for scripts or troubleshooting
   zoa deployments -o wide
+  zoa deployments -o json
 
-  # JSON output
-  zoa deployments -o json`,
+  zoa deployments --deployments-region eu-west-1`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			deployments, err := listDeploymentsFromSSM(cmd.Context())
+			if accessclient.DirectAccessOverrideActive(opts.AccessFunctionURL, opts.AccessInvokerRoleARN) {
+				return fmt.Errorf("zoa deployments does not support --access-url or --invoker-role-arn (deployment SSM only); use those flags with zoa targets or zoa session")
+			}
+			if err := accessclient.ValidateDirectAccessPair(opts.AccessFunctionURL, opts.AccessInvokerRoleARN); err != nil {
+				return err
+			}
+
+			deployments, err := listDeploymentsFromSSM(cmd.Context(), opts.DeploymentsRegion)
 			if err != nil {
 				return fmt.Errorf("listing deployments from SSM: %w", err)
 			}
@@ -88,44 +93,37 @@ func printDeploymentsTable(w io.Writer, opts *GlobalOptions, deployments []ssmDe
 	wide := opts.OutputFormat == output.FormatWide
 	tw := output.NewTable(w)
 	if wide {
-		fmt.Fprintln(tw, "DEPLOYMENT\tREGION\tACCOUNT ID\tACCESS URL\tINVOKER ROLE")
+		fmt.Fprintln(tw, "DEPLOYMENT\tREGION\tACCESS URL\tINVOKER ROLE\tACCOUNT ID")
 	} else {
-		fmt.Fprintln(tw, "DEPLOYMENT\tREGION")
+		fmt.Fprintln(tw, "DEPLOYMENT\tREGION\tACCESS URL\tINVOKER ROLE")
 	}
 	for _, d := range deployments {
 		if wide {
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
 				d.DeploymentName,
 				output.Dash(d.Region),
-				output.Dash(d.AccountID),
 				output.Dash(d.AccessURL),
-				output.Dash(d.InvokerRoleARN))
+				output.Dash(d.InvokerRoleARN),
+				output.Dash(d.AccountID))
 			continue
 		}
-		fmt.Fprintf(tw, "%s\t%s\n", d.DeploymentName, output.Dash(d.Region))
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
+			d.DeploymentName,
+			output.Dash(d.Region),
+			output.Dash(d.AccessURL),
+			output.Dash(d.InvokerRoleARN))
 	}
 	return tw.Flush()
 }
 
 // listDeploymentsFromSSM reads /zoa/deployments from SSM Parameter Store
 // using the SRE's active AWS credentials (direct read, no Lambda involved).
-func listDeploymentsFromSSM(ctx context.Context) ([]ssmDeployment, error) {
-	cfg, err := awsconfig.LoadDefaultConfig(ctx)
+func listDeploymentsFromSSM(ctx context.Context, deploymentsRegion string) ([]ssmDeployment, error) {
+	params, err := accessclient.ListDeploymentParameters(ctx, deploymentsRegion)
 	if err != nil {
-		return nil, fmt.Errorf("loading AWS config: %w", err)
+		return nil, err
 	}
-
-	ssmClient := ssm.NewFromConfig(cfg)
-
-	out, err := ssmClient.GetParametersByPath(ctx, &ssm.GetParametersByPathInput{
-		Path:      aws.String(ssmDeploymentsPath + "/"),
-		Recursive: aws.Bool(false),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("reading SSM %s: %w", ssmDeploymentsPath, err)
-	}
-
-	return parseSSMDeploymentParameters(out.Parameters)
+	return parseSSMDeploymentParameters(params)
 }
 
 // parseSSMDeploymentParameters decodes deployment JSON blobs from SSM parameters.

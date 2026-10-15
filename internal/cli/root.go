@@ -21,6 +21,13 @@ type GlobalOptions struct {
 	Region       string
 	OutputFormat output.Format
 
+	// Central SSM region for /zoa/deployments; empty = primary then replica failover.
+	DeploymentsRegion string
+
+	// Direct Access endpoint override (flags only; both required together). Not break-glass (kube/aws).
+	AccessFunctionURL    string
+	AccessInvokerRoleARN string
+
 	// Deployment is set by individual commands (targets positional arg,
 	// session --deployment flag) to enable auto-resolution of the Access
 	// URL and invoker role from SSM. Not a user-facing global flag.
@@ -47,23 +54,24 @@ func NewRootCommand() *cobra.Command {
 		Short: "ZOA — Zero Operator Access CLI",
 		Long: `ZOA (Zero Operator Access) — audited SRE operations on HyperFleet clusters.
 
-Typical workflow (boundary):
-  zoa deployments                           List deployments (central SSM; no API URL)
-  zoa targets us-east-1                     List RC/MC targets (use your deployment name)
-  zoa session start us-east-1 mc01          Start a time-boxed session for audited SRE access
+Laptop — discover and open a boundary session (Central AWS login; no ZOA_API_URL):
+  zoa deployments
+  zoa targets us-east-1
+  zoa session start us-east-1 regional --reason ROSAENG-1234
 
-Trusted Actions (per-target API Lambda in each VPC):
-  export ZOA_API_URL="https://..."     Function URL for the target you are operating on
-  zoa run <action> ...                 Execute a Trusted Action
+Deployment metadata comes from Central SSM (/zoa/deployments). By default the CLI tries
+us-east-1, then eu-west-1 if the first read errors. Use --deployments-region to pin one
+region (disables failover). Use --access-url and --invoker-role-arn together on targets
+and session only to skip Central deployment SSM autodiscovery (uncommon).
 
-Session and discovery commands resolve the Access Lambda from the deployment name
-via SSM and assume the invoker role automatically. TA commands use ZOA_API_URL.
+Inside the boundary — Trusted Actions (API Lambda; ZOA_API_URL is set on the task):
+  zoa run <action> --reason ROSAENG-1234 ...
 
-Boundary session/join: use your normal Jump/Central AWS login for the Access API (invoker role).
-ECS Exec uses scoped credentials returned by Access on join — not deployment-account admin roles.
-Requires session-manager-plugin.
+Discovery and session commands resolve the Access Lambda from the deployment name,
+assume the invoker role, and call the Access API. ECS Exec uses scoped credentials
+from Access on join (not deployment-admin roles). Requires session-manager-plugin.
 
-All requests start from your default AWS credential chain (SigV4).`,
+All requests use your default AWS credential chain (SigV4).`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -76,6 +84,9 @@ All requests start from your default AWS credential chain (SigV4).`,
 			}
 			if catalogCommandUsesOffline(cmd) {
 				return nil
+			}
+			if opts.APIURL == "" {
+				opts.APIURL = os.Getenv("ZOA_API_URL")
 			}
 			// `zoa deployments` reads SSM directly — no API URL needed.
 			if name == "deployments" {
@@ -97,8 +108,11 @@ All requests start from your default AWS credential chain (SigV4).`,
 		},
 	}
 
-	cmd.PersistentFlags().StringVar(&opts.APIURL, "api-url", os.Getenv("ZOA_API_URL"), "ZOA endpoint URL: Function URL, API Gateway, or CNAME (env: ZOA_API_URL)")
+	cmd.PersistentFlags().StringVar(&opts.APIURL, "api-url", "", "API Lambda URL for Trusted Actions (env: ZOA_API_URL); not used for session/discovery")
 	cmd.PersistentFlags().StringVar(&opts.Region, "region", os.Getenv("AWS_REGION"), "AWS region override for custom CNAME endpoints (env: AWS_REGION)")
+	cmd.PersistentFlags().StringVar(&opts.DeploymentsRegion, "deployments-region", "", "Pin Central SSM region for /zoa/deployments; empty = try us-east-1 then eu-west-1 on error (deployments, targets, session)")
+	cmd.PersistentFlags().StringVar(&opts.AccessFunctionURL, "access-url", "", "Access Lambda URL; with --invoker-role-arn skips Central deployment SSM autodiscovery (targets and session only)")
+	cmd.PersistentFlags().StringVar(&opts.AccessInvokerRoleARN, "invoker-role-arn", "", "Access invoker role ARN; with --access-url skips Central deployment SSM autodiscovery (targets and session only)")
 	var outputFlag string
 	cmd.PersistentFlags().StringVarP(&outputFlag, "output", "o", "table", "Output format: table, wide, json")
 	cobra.OnInitialize(func() {
@@ -219,7 +233,11 @@ func newRealClient(opts *GlobalOptions) (*client.Client, error) {
 func newDeploymentClient(opts *GlobalOptions) (*client.Client, error) {
 	ctx := context.Background()
 
-	info, err := accessclient.Resolve(ctx, opts.Deployment)
+	if accessclient.DirectAccessOverrideActive(opts.AccessFunctionURL, opts.AccessInvokerRoleARN) {
+		fmt.Fprintln(os.Stderr, "warning: skipping deployment SSM autodiscovery (direct Access flags set)")
+	}
+
+	info, err := accessclient.ResolveDeployment(ctx, opts.Deployment, opts.DeploymentsRegion, opts.AccessFunctionURL, opts.AccessInvokerRoleARN)
 	if err != nil {
 		return nil, fmt.Errorf("resolving deployment %q: %w", opts.Deployment, err)
 	}

@@ -21,15 +21,17 @@ Direct `kubectl` / `oc` against fleet clusters is **not** the production path; u
 
 You are **personally identified** on every ZOA call from the laptop: the CLI signs requests with **SigV4** and sends **`X-Operator`** = `sts:GetCallerIdentity().Arn`. For the invoker role, the **STS session name** on that ARN is your username (e.g. `slopezma`). That value becomes **`operator`** on session rows and in audit.
 
-### 2. Discover deployments (Central SSM, no Lambda)
+### 2. Discover deployments (Central SSM)
 
 ```bash
 zoa deployments
 ```
 
-Reads **`/zoa/deployments/`** in the **Central account** only (direct SSM from your Central credentials — no Access Lambda, no invoker assume yet).
+Reads **`/zoa/deployments/`** in the **Central account** (primary SSM region **`us-east-1`** today). No Access Lambda and no invoker assume yet—direct SSM from Central credentials.
 
-Each **regional pipeline** registers its deployment when ZOA is provisioned (deployment name, Access Function URL, invoker role ARN, region). Entries are **removed when that regional deployment is destroyed**, so the list stays current for ephemeral and long-lived regions alike.
+Each **regional pipeline** registers its deployment when ZOA is provisioned. Entries are **removed when that regional deployment is destroyed**.
+
+Optional discovery flags (pin SSM region, direct Access URL) are documented in [ZOA deployment discovery](../design/zoa-deployment-discovery.md); you do not need them for the usual `deployments` → `targets` → `session start` flow.
 
 ### 3. Discover targets (Access Lambda + RC SSM)
 
@@ -41,7 +43,7 @@ zoa targets <deployment>
 2. CLI calls the deployment’s **Access Lambda** Function URL (SigV4 + `X-Operator`).
 3. Access validates the caller is allowed to invoke the URL, then lists **targets** registered under **`/zoa/targets/<deployment>/`** in the **Regional Cluster (RC) account** Parameter Store.
 
-Each parameter is one boundary-capable cluster: **RC** (`eph-…-regional`) and **MC** targets (e.g. `eph-…-mc01`) as provisioned. Terraform writes parameters at cluster bring-up and deletes them on destroy.
+Each parameter is one boundary-capable cluster: **RC** (target id `regional`) and **MC** targets (e.g. `mc01`) as provisioned. Terraform writes parameters at cluster bring-up and deletes them on destroy.
 
 ### 4. Start session, join Exec, and ownership
 
@@ -208,7 +210,7 @@ Central SSM only — see [§2 above](#2-discover-deployments-central-ssm-no-lamb
 
 | Column           | Meaning                                                                                   |
 | ---------------- | ----------------------------------------------------------------------------------------- |
-| **DEPLOYMENT**   | Name passed to `zoa session` and `zoa targets` (e.g. `us-east-1`, `us-east-1-eph-abc123`) |
+| **DEPLOYMENT**   | Name passed to `zoa session` and `zoa targets` (e.g. `us-east-1`, `eu-west-1`) |
 | **ACCESS URL**   | ZOA Access Lambda Function URL                                                            |
 | **INVOKER ROLE** | Role to assume before calling Access                                                      |
 

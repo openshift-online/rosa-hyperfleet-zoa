@@ -18,19 +18,25 @@ func newTargetsCommand(opts *GlobalOptions) *cobra.Command {
 		Short: "List targets within a deployment",
 		Long: `List the targets (RC and MC clusters) available in a given deployment.
 
-Use a deployment name from 'zoa deployments' (e.g. us-east-1). The CLI
-auto-resolves the Access Lambda and invoker role from SSM, then lists targets.
+Resolves the deployment from Central SSM (us-east-1, then eu-west-1 on error,
+or --deployments-region only), assumes the invoker role, and calls the Access
+Lambda. Target rows come from the regional account (not from your laptop SSM).
 
-STATUS is registration metadata from cluster Terraform (ready = registered in SSM
-with boundary VPC/ECS metadata and eligible for session start; not a health probe).
+Use the TARGET column with zoa session start (e.g. regional, mc01).
+STATUS is Terraform registration metadata (ready = eligible for session start).
 
-Default table shows TARGET, REGION, TYPE, and STATUS. Use -o wide for full SSM
-metadata (VPC, subnets, ECS, Function URL, etc.); use -o json for automation.`,
+Optional: --deployments-region to pin Central SSM; --access-url and
+--invoker-role-arn together to skip Central deployment SSM autodiscovery.`,
 		Example: `  zoa targets us-east-1
 
   zoa targets us-east-1 -o wide
+  zoa targets us-east-1 -o json
 
-  zoa targets us-east-1 -o json`,
+  zoa targets us-east-1 --deployments-region eu-west-1
+
+  zoa targets us-east-1 \
+    --access-url 'https://<id>.lambda-url.us-east-1.on.aws/' \
+    --invoker-role-arn 'arn:aws:iam::123456789012:role/us-east-1-zoa-access-invoker'`,
 		Args: func(_ *cobra.Command, args []string) error {
 			if len(args) < 1 {
 				return fmt.Errorf("deployment is required: zoa targets <deployment>\n\n  Run 'zoa deployments' to list deployment names")

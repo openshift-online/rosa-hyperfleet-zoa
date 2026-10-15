@@ -23,7 +23,24 @@ func newSessionCommand(opts *GlobalOptions) *cobra.Command {
 		Short: "Manage boundary sessions",
 		Long: `Start, terminate, join, and list boundary sessions for audited SRE access.
 
-Session IDs use the form <deployment>/<session-id> (see 'zoa session start').`,
+Resolves the deployment from Central SSM (automatic us-east-1 then eu-west-1
+failover, or --deployments-region). Optional --access-url and --invoker-role-arn
+skip Central deployment SSM autodiscovery (both required; URL and ARN known in advance).
+
+Session compound IDs: <deployment>/<session-id> (e.g. us-east-1/1989937d-...).`,
+		Example: `  zoa session start us-east-1 regional --reason ROSAENG-1234
+  zoa session list us-east-1
+  zoa session join us-east-1/1989937d-0889-485d-b64e-facee9e0150d
+
+  zoa session start us-east-1 regional --reason ROSAENG-1234 --deployments-region eu-west-1
+
+  zoa session start us-east-1 regional --reason ROSAENG-1234 \
+    --access-url 'https://<id>.lambda-url.us-east-1.on.aws/' \
+    --invoker-role-arn 'arn:aws:iam::123456789012:role/us-east-1-zoa-access-invoker'
+
+  zoa session join us-east-1/1989937d-0889-485d-b64e-facee9e0150d \
+    --access-url 'https://<id>.lambda-url.us-east-1.on.aws/' \
+    --invoker-role-arn 'arn:aws:iam::123456789012:role/us-east-1-zoa-access-invoker'`,
 	}
 
 	cmd.AddCommand(
@@ -47,8 +64,9 @@ func newSessionStartCommand(opts *GlobalOptions) *cobra.Command {
 		Short: "Start a boundary session",
 		Long: `Start a boundary session for audited SRE access to a target cluster.
 
-Positional args: <deployment> <target>. Also available as flags for scripts.
-The CLI auto-resolves the Access Lambda URL and invoker role from SSM.
+Positional args: <deployment> <target> (from zoa deployments / zoa targets).
+Resolves Access URL and invoker role from Central SSM unless --access-url and
+--invoker-role-arn are set. Global --deployments-region pins the SSM region.
 
 By default, after the task is active the CLI connects via ECS Exec (same as
 'zoa session join'). Use --no-connect to only print session metadata and exit
@@ -59,7 +77,7 @@ deployment-account admin roles).
 
 A reason is required (Jira issue or PagerDuty incident). It is stored
 on the session, Access audit, and the boundary task (ZOA_REASON) for zoa run.`,
-		Example: `  zoa session start us-east-1 mc01 --reason ROSAENG-1234
+		Example: `  zoa session start us-east-1 regional --reason ROSAENG-1234
 
   zoa session start us-east-1 mc01 --reason '#123456' --no-connect
 
@@ -193,7 +211,7 @@ func newSessionTerminateCommand(opts *GlobalOptions) *cobra.Command {
 Stops the ECS task and marks the session terminated in DynamoDB. This is final —
 the task cannot be restarted. The compound ID is returned by 'zoa session start'
 and 'zoa session list'.`,
-		Example: `  zoa session terminate us-east-1/sess-abc123`,
+		Example: `  zoa session terminate us-east-1/1989937d-0889-485d-b64e-facee9e0150d`,
 		Args:    cobra.ExactArgs(1),
 		RunE:    run,
 	}
@@ -207,7 +225,7 @@ func newSessionJoinCommand(opts *GlobalOptions) *cobra.Command {
 
 Calls the Access API for ownership checks, then opens an interactive shell via
 ECS Exec and session-manager-plugin using scoped credentials from the join response.`,
-		Example: `  zoa session join us-east-1/sess-abc123`,
+		Example: `  zoa session join us-east-1/1989937d-0889-485d-b64e-facee9e0150d`,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			deployment, rawID, err := ParseSessionID(args[0])
@@ -267,13 +285,13 @@ func newSessionListCommand(opts *GlobalOptions) *cobra.Command {
 Only the signed-in operator's sessions are returned; the API does not allow
 listing other operators here. Use 'zoa session history' for fleet-wide audit.`,
 		Example: `  # All your sessions in the last 24h (default)
-  zoa session list us-east-1-eph-f37869e8
+  zoa session list us-east-1
 
-  zoa session list us-east-1-eph-f37869e8 --status active
+  zoa session list us-east-1 --status active
 
-  zoa session list us-east-1-eph-f37869e8 -t eph-f37869e8-regional
+  zoa session list us-east-1 -t regional
 
-  zoa session list us-east-1-eph-f37869e8 -o json`,
+  zoa session list us-east-1 -o json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			deployment := args[0]

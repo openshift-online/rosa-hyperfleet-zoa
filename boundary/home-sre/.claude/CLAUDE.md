@@ -35,8 +35,8 @@ This is **ROSA HyperFleet**: **Amazon EKS** clusters running platform software �
 
 | Concept                             | Meaning                                                                                                                                            |
 | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Deployment** (`ZOA_DEPLOYMENT`)   | HyperFleet environment name (e.g. `us-east-1-eph-046f5f15`, integration, stage).                                                                   |
-| **Target** (`ZOA_TARGET`)           | Which cluster this session attaches to (e.g. `eph-046f5f15-regional`, `eph-046f5f15-mc01`).                                                        |
+| **Deployment** (`ZOA_DEPLOYMENT`)   | HyperFleet deployment name (e.g. `us-east-1`, `eu-west-1`).                                                                                      |
+| **Target** (`ZOA_TARGET`)           | Target id from `zoa targets` (e.g. `regional`, `mc01`).                                                                                            |
 | **Target type** (`ZOA_TARGET_TYPE`) | **`rc`** = Regional Cluster, or **`mc`** = Management Cluster — same as **TYPE** in `zoa targets`; filters offline catalog and Lambda TA registry. |
 
 **Regional Cluster (RC)** — typically **one per AWS region** per environment. EKS runs regional platform services (e.g. Platform API, hyperfleet-operator, kube-applier controller on RC if deployed, Argo CD, observability stack).

@@ -54,12 +54,14 @@ func TestParseSSMDeploymentParameters_WhenInvalidJSON_ItShouldReturnError(t *tes
 	}
 }
 
-func TestPrintDeploymentsTable_WhenDefault_ItShouldOmitSensitiveColumns(t *testing.T) {
+func TestPrintDeploymentsTable_WhenDefault_ItShouldIncludeAccessURLAndInvoker(t *testing.T) {
+	url := "https://example.lambda-url.us-east-1.on.aws/"
+	role := "arn:aws:iam::123:role/invoker"
 	deployments := []ssmDeployment{{
 		DeploymentName: "us-east-1-eph",
 		Region:         "us-east-1",
-		AccessURL:      "https://secret.lambda-url.on.aws/",
-		InvokerRoleARN: "arn:aws:iam::123:role/invoker",
+		AccessURL:      url,
+		InvokerRoleARN: role,
 		AccountID:      "123456789012",
 	}}
 
@@ -69,11 +71,13 @@ func TestPrintDeploymentsTable_WhenDefault_ItShouldOmitSensitiveColumns(t *testi
 		t.Fatalf("printDeploymentsTable: %v", err)
 	}
 	out := buf.String()
-	if strings.Contains(out, "ACCESS URL") || strings.Contains(out, "lambda-url") {
-		t.Fatalf("default table should not show URLs, got:\n%s", out)
+	for _, want := range []string{"ACCESS URL", "INVOKER ROLE", url, role, "us-east-1-eph"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected default output to contain %q, got:\n%s", want, out)
+		}
 	}
-	if !strings.Contains(out, "us-east-1-eph") {
-		t.Fatalf("expected deployment name in output, got:\n%s", out)
+	if strings.Contains(out, "123456789012") {
+		t.Fatalf("default table should not show account ID, got:\n%s", out)
 	}
 }
 
@@ -94,7 +98,7 @@ func TestPrintDeploymentsTable_WhenWide_ItShouldIncludeAllMetadata(t *testing.T)
 		t.Fatalf("printDeploymentsTable: %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{"ACCESS URL", "INVOKER ROLE", "ACCOUNT ID", url, role, "123456789012"} {
+	for _, want := range []string{"ACCESS URL", "INVOKER ROLE", "ACCOUNT ID", url, role, "123456789012", "us-east-1-eph"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected wide output to contain %q, got:\n%s", want, out)
 		}

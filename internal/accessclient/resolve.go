@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
@@ -44,15 +43,15 @@ type ssmDeployment struct {
 // The caller's existing AWS credentials (e.g. Central Account via rh-aws-saml-login)
 // are used for SSM read and STS AssumeRole. The returned DeploymentInfo contains
 // temporary credentials scoped to the invoker role and the Access Lambda URL.
-func Resolve(ctx context.Context, deploymentName string) (*DeploymentInfo, error) {
-	cfg, err := awsconfig.LoadDefaultConfig(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("loading AWS config: %w", err)
-	}
-
-	dep, err := readDeploymentSSM(ctx, cfg, deploymentName)
+func Resolve(ctx context.Context, deploymentName, deploymentsRegion string) (*DeploymentInfo, error) {
+	dep, err := ReadDeploymentParameter(ctx, deploymentName, deploymentsRegion)
 	if err != nil {
 		return nil, err
+	}
+
+	cfg, err := AWSConfigForDeploymentsSSM(ctx, DefaultDeploymentsSSMRegion)
+	if err != nil {
+		return nil, fmt.Errorf("loading AWS config: %w", err)
 	}
 
 	sessionName, err := extractSessionName(ctx, cfg)
@@ -89,18 +88,21 @@ func readDeploymentSSM(ctx context.Context, cfg aws.Config, name string) (*ssmDe
 		return nil, fmt.Errorf("reading SSM %s: %w", paramName, err)
 	}
 
+	return parseDeploymentSSMParameter(name, aws.ToString(out.Parameter.Value))
+}
+
+func parseDeploymentSSMParameter(name, raw string) (*ssmDeployment, error) {
+	paramName := ssmDeploymentsPath + "/" + name
 	var dep ssmDeployment
-	if err := json.Unmarshal([]byte(aws.ToString(out.Parameter.Value)), &dep); err != nil {
+	if err := json.Unmarshal([]byte(raw), &dep); err != nil {
 		return nil, fmt.Errorf("parsing SSM parameter %s: %w", paramName, err)
 	}
-
 	if dep.AccessURL == "" {
 		return nil, fmt.Errorf("deployment %q has no access_url in SSM", name)
 	}
 	if dep.InvokerRoleARN == "" {
 		return nil, fmt.Errorf("deployment %q has no invoker_role_arn in SSM", name)
 	}
-
 	return &dep, nil
 }
 
