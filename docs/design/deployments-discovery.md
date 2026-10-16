@@ -2,7 +2,12 @@
 
 On your **laptop**, ZOA finds the right **Access Lambda** for a HyperFleet environment using **Central account SSM**. You do **not** set URLs or regions for normal work.
 
-Full session flow (login, targets, boundary): [Operator workflow](../guides/operator-workflow.md).
+| Doc                                                                            | Use when                                                            |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| [Operator workflow](../guides/operator-workflow.md)                            | Full session path (start, join, `zoa run`, terminate)               |
+| [Boundary architecture — Discovery](../boundary/architecture.md#discovery-ssm) | **Which account** holds which SSM path (diagram + MC targets in RC) |
+
+This page covers **CLI behavior only**: default reads, regional failover, and DR overrides.
 
 ## First day — what to run
 
@@ -19,7 +24,7 @@ zoa session start us-east-1 regional --reason ROSAENG-1234
 | **Deployment** | Environment name from `zoa deployments` (e.g. `us-east-1`).                     |
 | **Target**     | Cluster id from the `TARGET` column of `zoa targets` (e.g. `regional`, `mc01`). |
 
-**Targets** are **not** in Central SSM on your laptop. After ZOA resolves the deployment, the **Access Lambda** reads target metadata from the regional account.
+**Targets** are **not** in Central SSM. The CLI calls **Access**, which reads **`/zoa/targets/<deployment>/…`** in the **RC** account (MC targets are stored there too — see [architecture](../boundary/architecture.md#discovery-ssm)).
 
 You do **not** need `AWS_REGION` or `ZOA_*` env vars for this discovery path.
 

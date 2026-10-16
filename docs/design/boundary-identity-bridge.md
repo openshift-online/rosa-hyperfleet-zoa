@@ -2,6 +2,7 @@
 
 The **identity bridge** is how ZOA attributes **Trusted Actions** and **API audit** to a **human SRE** when the HTTP caller is an **ECS task role** shared by every boundary container on a target. Without it, audit would show only an ECS task UUID, not `slopezma`.
 
+**Full chain (laptop → TA):** [Operator workflow §4](../guides/operator-workflow.md#4-start-session-join-exec-and-ownership).  
 **Operator guide (credentials and workflow):** [Operator workflow — Identity and SigV4](../guides/operator-workflow.md#identity-and-sigv4).  
 **Session row storage and GSIs:** [Storage — boundary sessions](../architecture/storage.md#boundary-sessions).
 

@@ -30,7 +30,7 @@ A compromised **invoker** can manage sessions but cannot impersonate arbitrary T
 
 Three credential layers: **invoker + SigV4** to Access, **vended Exec credentials** scoped to one task on join, **ECS task role + SigV4** to the API inside the container.
 
-Human attribution for TAs uses the **[identity bridge](../design/boundary-identity-bridge.md)** (task id → session row → `operator`). See [Operator workflow](../guides/operator-workflow.md#identity-and-sigv4) for the SRE walkthrough.
+Human attribution for TAs uses the **[identity bridge](../design/boundary-identity-bridge.md)** (task id → session row → `operator`). Full sequence diagram: [Operator workflow §4](../guides/operator-workflow.md#4-start-session-join-exec-and-ownership).
 
 ## Session lifecycle
 
@@ -44,12 +44,30 @@ Session lifecycle APIs live on **Access** only, not the API Lambda.
 
 ## Discovery (SSM)
 
-| Path                                     | Written by                      | Read by                    | Purpose                                         |
-| ---------------------------------------- | ------------------------------- | -------------------------- | ----------------------------------------------- |
-| `/zoa/deployments/<deployment_name>`     | RC Terraform (central provider) | Laptop (`zoa deployments`) | Access Function URL + invoker role              |
-| `/zoa/targets/<deployment>/<cluster_id>` | `zoa-lambda` per target         | Access Lambda              | ECS cluster, subnets, task def, **ZOA_API_URL** |
+**Operator runbook** (failover, `--deployments-region`, DR `--access-url`): [Deployment discovery](../design/deployments-discovery.md).
 
-Details: [deployments discovery](../design/deployments-discovery.md).
+Deployments are **thin pointers** in the Central account so the laptop can find Access before any regional call. **Target** parameters (VPC, subnets, ECS, **ZOA_API_URL**) live in the **RC** account only — including **MC** clusters (Terraform writes MC targets to RC SSM via `zoa-data-access`, not the MC account).
+
+| Path                                     | Account | Written by                      | Read by                    | Purpose                            |
+| ---------------------------------------- | ------- | ------------------------------- | -------------------------- | ---------------------------------- |
+| `/zoa/deployments/<deployment_name>`     | Central | RC Terraform (central provider) | Laptop (`zoa deployments`) | Access Function URL + invoker role |
+| `/zoa/targets/<deployment>/<cluster_id>` | **RC**  | `zoa-lambda` per target         | Access Lambda              | Boundary + API wiring for that VPC |
+
+```mermaid
+flowchart LR
+  Laptop[Laptop zoa CLI]
+  Dep["Central SSM /zoa/deployments/…"]
+  Access[Access Lambda RC]
+  Tgt["RC SSM /zoa/targets/…"]
+  DDB[(boundary-sessions RC)]
+
+  Laptop -->|hub creds read| Dep
+  Laptop -->|invoker SigV4| Access
+  Access -->|read targets| Tgt
+  Access -->|session rows| DDB
+```
+
+Laptop → boundary → TA (Exec, API, identity bridge): [Operator workflow §4](../guides/operator-workflow.md#4-start-session-join-exec-and-ownership).
 
 ## RC vs MC
 
@@ -64,6 +82,8 @@ Cluster VPCs use **gateway** and **interface** endpoints (S3, DynamoDB, STS, log
 
 ## Related
 
+- [Deployment discovery](../design/deployments-discovery.md) — operator CLI and DR
+- [Operator workflow](../guides/operator-workflow.md) — end-to-end SRE path
 - [Container image](container-image.md)
 - [Session logging](../design/boundary-session-logging.md)
 - [Break-glass (planned)](../break-glass/README.md)

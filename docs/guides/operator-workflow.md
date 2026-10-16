@@ -43,7 +43,7 @@ zoa targets <deployment>
 2. CLI calls the deployment’s **Access Lambda** Function URL (SigV4 + `X-Operator`).
 3. Access validates the caller is allowed to invoke the URL, then lists **targets** registered under **`/zoa/targets/<deployment>/`** in the **Regional Cluster (RC) account** Parameter Store.
 
-Each parameter is one boundary-capable cluster: **RC** (target id `regional`) and **MC** targets (e.g. `mc01`) as provisioned. Terraform writes parameters at cluster bring-up and deletes them on destroy.
+Each parameter is one boundary-capable cluster: **RC** (`regional`) and **MC** (e.g. `mc01`). SSM layout: [Boundary architecture — Discovery](../boundary/architecture.md#discovery-ssm).
 
 ### 4. Start session, join Exec, and ownership
 
@@ -72,21 +72,54 @@ Only **you** (the session owner) can **join** or **terminate** that session. `zo
 sequenceDiagram
   participant SRE as Laptop SRE
   participant Central as Central SSM
-  participant Access as Access Lambda
-  participant DDB as Sessions DynamoDB
-  participant ECS as Boundary ECS task
-  participant CW as CloudWatch Exec logs
+  participant Invoker as Invoker role
+  participant Access as Access Lambda RC
+  participant RC as RC SSM targets
+  participant DDB as boundary-sessions
+  participant ECS as Boundary Fargate
+  participant CW as CloudWatch Exec
+  participant API as API Lambda VPC
+  participant EKS as Target EKS
 
+  Note over SRE,Central: Discover deployment no Lambda
   SRE->>Central: zoa deployments
-  SRE->>Access: zoa targets (invoker + SigV4)
-  SRE->>Access: session start
-  Access->>DDB: create session operator=slopezma
-  Access->>ECS: RunTask metadata
-  SRE->>Access: session join
-  Access-->>SRE: exec-scoped STS creds
-  SRE->>ECS: ECS Exec PTY
-  ECS->>CW: terminal input and output
+  Central-->>SRE: access_url invoker_role_arn
+
+  Note over SRE,Access: Discover targets
+  SRE->>Invoker: AssumeRole session name = username
+  SRE->>Access: zoa targets deployment SigV4 invoker
+  Access->>RC: GetParametersByPath /zoa/targets/...
+  Access-->>SRE: regional mc01 ...
+
+  Note over SRE,ECS: Start session
+  SRE->>Access: session start reason body
+  Access->>DDB: Put sessionId operator signer_arn invoker
+  Access->>ECS: ecs:RunTask in target VPC
+  Access->>DDB: Update task_id task_arn
+  Access-->>SRE: session id status
+
+  Note over SRE,CW: Interactive shell
+  SRE->>Access: session join ownership check
+  Access-->>SRE: vended Exec-scoped STS
+  SRE->>ECS: execute-command SSM WebSocket
+  ECS->>CW: PTY transcript per exec session id
+
+  Note over ECS,EKS: Trusted Action
+  ECS->>API: zoa run SigV4 task role X-Operator task ARN
+  API->>DDB: GetByTaskID task id GSI
+  DDB-->>API: operator sessionId
+  API->>EKS: ephemeral SA impersonation RBAC
+  API->>DDB: execution + audit rows
+  API-->>ECS: TA output stream
 ```
+
+| Step                       | Credential        | Human in audit                                                                    |
+| -------------------------- | ----------------- | --------------------------------------------------------------------------------- |
+| `zoa deployments`          | Central hub role  | (SSM read only)                                                                   |
+| `zoa targets`, `session *` | Invoker + SigV4   | Invoker session name → `operator`                                                 |
+| `session join`             | Invoker           | Must match session `operator`                                                     |
+| ECS Exec                   | Vended exec creds | Same human; one task ARN                                                          |
+| `zoa run`                  | ECS **task role** | [Identity bridge](../design/boundary-identity-bridge.md) (`task_id` → `operator`) |
 
 ### 5. Inside the boundary container
 
@@ -183,13 +216,15 @@ Boundary tasks share one **ECS task role** per target; the API sees the **task i
 
 Full design: [Identity bridge](../design/boundary-identity-bridge.md). Control-plane split: [Boundary architecture](../boundary/architecture.md).
 
+Raw **`aws`** / **`oc`** from the boundary today use the **task role** (shared in CloudTrail). Planned break-glass: short-lived STS from a ZOA API path — [break-glass](../break-glass/README.md).
+
 ## Discover deployments
 
 ```bash
 zoa deployments
 ```
 
-Central SSM only — see [§2 above](#2-discover-deployments-central-ssm-no-lambda). Column reference:
+Central SSM only — see [§2 above](#2-discover-deployments-central-ssm). Failover and DR flags: [Deployment discovery](../design/deployments-discovery.md). Column reference:
 
 | Column           | Meaning                                                                        |
 | ---------------- | ------------------------------------------------------------------------------ |
@@ -255,11 +290,11 @@ Reaper rules (deadline / inactivity): [Session reaper](../design/boundary-sessio
 
 ## Troubleshooting
 
-| Symptom                       | Check                                                                                                                                                                                                                                                               |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `deployments` empty           | Central credentials; SSM path `/zoa/deployments/`                                                                                                                                                                                                                   |
-| `session start` fails         | Invoker role trust; target exists in `zoa targets`                                                                                                                                                                                                                  |
-| Exec handshake fails          | `session-manager-plugin`; KMS/exec-scoped role (see [session logging](../design/boundary-session-logging.md))                                                                                                                                                       |
-| `zoa run` fails               | `ZOA_API_URL` in container; task role on API Function URL resource policy                                                                                                                                                                                           |
-| Claude / Bedrock errors       | Bedrock model enabled in account; see hyperfleet `zoa-boundary` Bedrock agreements                                                                                                                                                                                  |
+| Symptom                       | Check                                                                                                                                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `deployments` empty           | Central credentials; SSM path `/zoa/deployments/`                                                                                                                                                                        |
+| `session start` fails         | Invoker role trust; target exists in `zoa targets`                                                                                                                                                                       |
+| Exec handshake fails          | `session-manager-plugin`; KMS/exec-scoped role (see [session logging](../design/boundary-session-logging.md))                                                                                                            |
+| `zoa run` fails               | `ZOA_API_URL` in container; task role on API Function URL resource policy                                                                                                                                                |
+| Claude / Bedrock errors       | Bedrock model enabled in account; see hyperfleet `zoa-boundary` Bedrock agreements                                                                                                                                       |
 | Session transcript in Grafana | [Exec log stream](../design/boundary-session-logging.md#viewing-session-logs-in-grafana-explorer) — `exec_session_ids[]` → `@logStream = "ecs-execute-command-…"`; one stream per join; use **`zoa runs`** for TA detail |

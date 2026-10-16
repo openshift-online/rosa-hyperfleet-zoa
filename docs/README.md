@@ -6,24 +6,24 @@ Platform Terraform and accounts: [ZOA architecture (rosa-hyperfleet)](https://gi
 
 ## Start here
 
-| You are…               | Read                                                                                          |
-| ---------------------- | --------------------------------------------------------------------------------------------- |
-| **Operator** (session) | [Operator workflow](guides/operator-workflow.md) → `zoa session start` → work inside boundary |
-| **TA author**          | [Trusted Actions](trusted-actions.md) — writing, testing, conformance gates                   |
-| **Contributor**        | [Development](development.md) · [E2E testing](e2e-testing.md)                                 |
+| You are…               | Read                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------- |
+| **Operator** (session) | [Operator workflow](guides/operator-workflow.md) — laptop → TA sequence diagram in §4 |
+| **TA author**          | [Trusted Actions](trusted-actions.md) — writing, testing, conformance gates           |
+| **Contributor**        | [Development](development.md) · [E2E testing](e2e-testing.md)                         |
 
 ## Boundary
 
 The boundary is the shell. Everything else happens inside it.
 
-| Document                                                | Description                                             |
-| ------------------------------------------------------- | ------------------------------------------------------- |
-| [Boundary architecture](boundary/architecture.md)       | Access vs API Lambda, SSM, session lifecycle            |
-| [Container image](boundary/container-image.md)          | `Containerfile.boundary`, Konflux pipeline              |
-| [Identity bridge](design/boundary-identity-bridge.md)   | Task ARN → session → human operator (TA attribution)    |
-| [Session logging](design/boundary-session-logging.md)   | CloudWatch log groups, Grafana Explorer forensics       |
-| [Session reaper](design/boundary-session-reaper.md)     | Deadline, idle, and operator terminate                  |
-| [Deployment discovery](design/deployments-discovery.md) | Central SSM `/zoa/deployments`, failover, direct Access |
+| Document                                                | Description                                                |
+| ------------------------------------------------------- | ---------------------------------------------------------- |
+| [Boundary architecture](boundary/architecture.md)       | Control plane, **SSM topology** (Central vs RC), lifecycle |
+| [Container image](boundary/container-image.md)          | `Containerfile.boundary`, Konflux pipeline                 |
+| [Identity bridge](design/boundary-identity-bridge.md)   | Task ARN → session → human operator (TA attribution)       |
+| [Session logging](design/boundary-session-logging.md)   | CloudWatch log groups, Grafana Explorer forensics          |
+| [Session reaper](design/boundary-session-reaper.md)     | Deadline, idle, and operator terminate                     |
+| [Deployment discovery](design/deployments-discovery.md) | Laptop CLI: failover, `--deployments-region`, DR overrides |
 
 ## Trusted Actions
 
