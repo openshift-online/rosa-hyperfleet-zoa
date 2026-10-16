@@ -35,8 +35,12 @@ func (a *getSecretAction) Metadata() ActionMetadata {
 		ExecutionMode:     "sync",
 		Description:       "Get Kubernetes secrets with HCP namespace protection. Shows secret metadata and data keys by default; use verbose for base64 values.",
 		Authorization:     AuthorizationConfig{Approval: "none"},
-		DeploymentTargets: []string{DeploymentTargetRC, DeploymentTargetMC},
+		TargetTypes: []string{TargetTypeRC, TargetTypeMC},
 		TimeoutSeconds:    60,
+		Examples: []string{
+			"zoa run get_secret -n openshift-config --name pull-secret --reason ROSAENG-1234",
+			"zoa run get_secret -n grafana -l app=grafana --reason ROSAENG-1234",
+		},
 		Parameters: []ParameterDef{
 			{Name: "namespace", Required: true, Description: "Target namespace (HCP namespaces blocked)"},
 			{Name: "name", Required: false, Description: "Secret name (omit to list all secrets in namespace)"},

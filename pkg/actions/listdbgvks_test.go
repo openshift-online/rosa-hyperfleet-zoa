@@ -24,8 +24,8 @@ func TestListDBGVKs_Metadata_ItShouldBeAReadOnlyAWSAction(t *testing.T) {
 	if len(meta.Parameters) != 0 {
 		t.Errorf("expected no parameters, got %v", meta.Parameters)
 	}
-	if len(meta.DeploymentTargets) != 1 || meta.DeploymentTargets[0] != DeploymentTargetRC {
-		t.Errorf("expected deployment targets [%s], got %v", DeploymentTargetRC, meta.DeploymentTargets)
+	if len(meta.TargetTypes) != 1 || meta.TargetTypes[0] != TargetTypeRC {
+		t.Errorf("expected deployment targets [%s], got %v", TargetTypeRC, meta.TargetTypes)
 	}
 }
 

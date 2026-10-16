@@ -1,34 +1,70 @@
 # ZOA Documentation
 
-## Reference
+**Zero Operator Access (ZOA)** is the audited operator access model for ROSA HyperFleet. No standing cluster admin, no laptop-side `kubectl` — every action flows through an audited, reason-tagged path.
 
-| Document | Description |
-|----------|-------------|
-| [API Reference](api-reference.md) | HTTP endpoints, request/response formats, error codes |
-| [CLI Reference](cli-reference.md) | Commands, flags, examples |
-| [Trusted Actions Guide](trusted-actions.md) | How to author and test new TAs |
+Platform Terraform and accounts: [ZOA architecture (rosa-hyperfleet)](https://github.com/openshift-online/rosa-hyperfleet/blob/main/docs/design/zoa-architecture.md). Behavior and CLI/API contracts: **this repo**.
+
+## Start here
+
+| You are…               | Read                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------- |
+| **Operator** (session) | [Operator workflow](guides/operator-workflow.md) — laptop → TA sequence diagram in §4 |
+| **TA author**          | [Trusted Actions](trusted-actions.md) — writing, testing, conformance gates           |
+| **Contributor**        | [Development](development.md) · [E2E testing](e2e-testing.md)                         |
+
+## Boundary
+
+The boundary is the shell. Everything else happens inside it.
+
+| Document                                                | Description                                                |
+| ------------------------------------------------------- | ---------------------------------------------------------- |
+| [Boundary architecture](boundary/architecture.md)       | Control plane, **SSM topology** (Central vs RC), lifecycle |
+| [Container image](boundary/container-image.md)          | `Containerfile.boundary`, Konflux pipeline                 |
+| [Identity bridge](design/boundary-identity-bridge.md)   | Task ARN → session → human operator (TA attribution)       |
+| [Session logging](design/boundary-session-logging.md)   | CloudWatch log groups, Grafana Explorer forensics          |
+| [Session reaper](design/boundary-session-reaper.md)     | Deadline, idle, and operator terminate                     |
+| [Deployment discovery](design/deployments-discovery.md) | Laptop CLI: failover, `--deployments-region`, DR overrides |
+
+## Trusted Actions
+
+TAs run from inside the boundary via `zoa run`. They are the steady-state operational model.
+
+| Document                                 | Description                                        |
+| ---------------------------------------- | -------------------------------------------------- |
+| [TA authoring guide](trusted-actions.md) | Writing a new TA, conformance gates, RBAC patterns |
+| [API reference](api-reference.md)        | TA dispatch + Access session APIs                  |
+| [CLI reference](cli-reference.md)        | Commands, sessions, discovery, offline catalog     |
+
+## Break-glass
+
+Not implemented. See [break-glass/README.md](break-glass/README.md) for the planned stub.
+
+**Policy:** break-glass is a one-time escape hatch. Every break-glass use must produce a follow-up TA that automates the same operation — the TA catalog grows monotonically so the same emergency never requires raw access twice.
 
 ## Architecture
 
-| Document | Description |
-|----------|-------------|
-| [Lambda Model](architecture/lambda-model.md) | Lambda functions, self-invocation, concurrency model |
-| [Timeout Tuning](architecture/timeout-tuning.md) | Three-layer timeout architecture, adjustment procedures |
-| [Implementation Details](architecture/implementation.md) | Execution flows, package responsibilities, env vars, safety controls |
+Cross-cutting concerns that span all three pillars.
 
-## Development
+| Document                                         | Description                                            |
+| ------------------------------------------------ | ------------------------------------------------------ |
+| [Lambda model](architecture/lambda-model.md)     | API, Worker, Access — three modes from one image       |
+| [Implementation](architecture/implementation.md) | Package layout, execution flows, env by `HANDLER_MODE` |
+| [Storage](architecture/storage.md)               | DynamoDB tables, S3, TTL, GSIs                         |
+| [Timeout tuning](architecture/timeout-tuning.md) | Lambda ceiling → code deadline → per-TA timeout        |
 
-| Document | Description |
-|----------|-------------|
-| [Development Guide](development.md) | Build, test, lint, CI, releasing |
-| [End-to-End Testing](e2e-testing.md) | Deep/smoke tiers, running locally, CI image injection, AWS credentials |
+## Engineering
 
-## Documentation Philosophy
+| Document                          | Description                                       |
+| --------------------------------- | ------------------------------------------------- |
+| [Development](development.md)     | Build, test, lint, images                         |
+| [E2E testing](e2e-testing.md)     | Functional + monitoring suites, Makefile targets  |
+| [Observability](observability.md) | EMF metrics; Lambda logs in Grafana               |
+| [Konflux](konflux.md)             | `zoa-lambda`, `zoa-runner`, `zoa-boundary` images |
 
-Implementation-level architecture docs live **in this repo** (`docs/architecture/`) because they describe decisions specific to ZOA's code and are maintained by the same team that changes the code. This ensures docs stay in sync with the implementation.
+## Doc conventions
 
-Cross-system design proposals (how ZOA fits into the broader platform) live in the [rosa-hyperfleet](https://github.com/openshift-online/rosa-hyperfleet) repo as ADRs. These are referenced below for historical context but are not the source of truth for implementation details.
+- **Guides** — end-to-end tasks (operator workflow, TA authoring).
+- **Reference** — CLI/HTTP contracts. Keep in sync with code.
+- **Architecture / design** — durable behavior and security properties.
 
-## External Design Documents
-
-- [ZOA Architecture](https://github.com/openshift-online/rosa-hyperfleet/blob/main/docs/design/zoa-architecture.md) — infrastructure architecture, Terraform context, and platform integration
+Platform ADRs live in **rosa-hyperfleet**; implementation detail lives here with the code.

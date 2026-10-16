@@ -27,9 +27,12 @@ func (l *listEKSClusters) Metadata() ActionMetadata {
 		ExecutionMode:     "sync",
 		Description:       "List all EKS clusters in the configured AWS region.",
 		Authorization:     AuthorizationConfig{Approval: "none"},
-		DeploymentTargets: []string{DeploymentTargetRC, DeploymentTargetMC},
+		TargetTypes: []string{TargetTypeRC, TargetTypeMC},
 		TimeoutSeconds:    60,
-		Parameters:        []ParameterDef{},
+		Examples: []string{
+			"zoa run list_eks_clusters --reason ROSAENG-1234",
+		},
+		Parameters: []ParameterDef{},
 	}
 }
 
@@ -85,8 +88,11 @@ func (d *describeEKSCluster) Metadata() ActionMetadata {
 		ExecutionMode:     "sync",
 		Description:       "Describe a specific EKS cluster.",
 		Authorization:     AuthorizationConfig{Approval: "none"},
-		DeploymentTargets: []string{DeploymentTargetRC, DeploymentTargetMC},
+		TargetTypes: []string{TargetTypeRC, TargetTypeMC},
 		TimeoutSeconds:    60,
+		Examples: []string{
+			"zoa run describe_eks_cluster --name my-eks-cluster --reason ROSAENG-1234",
+		},
 		Parameters: []ParameterDef{
 			{Name: "name", Required: true, Description: "EKS cluster name"},
 		},

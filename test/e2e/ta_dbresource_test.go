@@ -55,7 +55,7 @@ func firstDBGVK(tgt target) (string, bool) {
 var _ = Describe("list_db_gvks", func() {
 	for _, tgt := range targets {
 		tgt := tgt
-		if tgt.DeploymentTarget != "rc" {
+		if tgt.TargetType != "rc" {
 			continue // RC-only: hyperfleet-db is not reachable from MC ZOA
 		}
 
@@ -85,7 +85,7 @@ var _ = Describe("list_db_gvks", func() {
 var _ = Describe("get_db_resource", func() {
 	for _, tgt := range targets {
 		tgt := tgt
-		if tgt.DeploymentTarget != "rc" {
+		if tgt.TargetType != "rc" {
 			continue // RC-only: hyperfleet-db is not reachable from MC ZOA
 		}
 
