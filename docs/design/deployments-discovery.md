@@ -14,10 +14,10 @@ zoa targets us-east-1        # RC + MC target ids (e.g. regional, mc01)
 zoa session start us-east-1 regional --reason ROSAENG-1234
 ```
 
-| Term | Meaning |
-| ---- | ------- |
-| **Deployment** | Environment name from `zoa deployments` (e.g. `us-east-1`). |
-| **Target** | Cluster id from the `TARGET` column of `zoa targets` (e.g. `regional`, `mc01`). |
+| Term           | Meaning                                                                         |
+| -------------- | ------------------------------------------------------------------------------- |
+| **Deployment** | Environment name from `zoa deployments` (e.g. `us-east-1`).                     |
+| **Target**     | Cluster id from the `TARGET` column of `zoa targets` (e.g. `regional`, `mc01`). |
 
 **Targets** are **not** in Central SSM on your laptop. After ZOA resolves the deployment, the **Access Lambda** reads target metadata from the regional account.
 
@@ -43,10 +43,10 @@ AWS Systems Manager Parameter Store has a published monthly SLA of **99.9%**; in
 
 Use these only when the default path (automatic `us-east-1` → `eu-west-1` failover) is not enough.
 
-| Situation | Flags | Commands | Effect |
-| --------- | ----- | -------- | ------ |
-| **Pin one Central SSM region** | `--deployments-region <aws-region>` | `deployments`, `targets`, every `session` subcommand that names a deployment | Reads `/zoa/deployments/*` **only** in that AWS region. **Turns off** automatic failover. Use when runbooks point you at the replica (e.g. `eu-west-1`) while primary SSM is failing. |
-| **Central deployment SSM unavailable everywhere** | `--access-url` **and** `--invoker-role-arn` (both required) | `targets` and `session` only — **not** `deployments` | Skips **Central deployment SSM autodiscovery**. You still pass the **deployment name** (e.g. `us-east-1`) so Access knows which environment to use. You must already have the Access URL and invoker ARN (saved from an earlier `zoa deployments`, IC/runbook, or a future **private ZOA deployments** page for DR). |
+| Situation                                         | Flags                                                       | Commands                                                                     | Effect                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pin one Central SSM region**                    | `--deployments-region <aws-region>`                         | `deployments`, `targets`, every `session` subcommand that names a deployment | Reads `/zoa/deployments/*` **only** in that AWS region. **Turns off** automatic failover. Use when runbooks point you at the replica (e.g. `eu-west-1`) while primary SSM is failing.                                                                                                                                |
+| **Central deployment SSM unavailable everywhere** | `--access-url` **and** `--invoker-role-arn` (both required) | `targets` and `session` only — **not** `deployments`                         | Skips **Central deployment SSM autodiscovery**. You still pass the **deployment name** (e.g. `us-east-1`) so Access knows which environment to use. You must already have the Access URL and invoker ARN (saved from an earlier `zoa deployments`, IC/runbook, or a future **private ZOA deployments** page for DR). |
 
 `zoa deployments` always needs SSM — it cannot bypass autodiscovery with `--access-url`. When SSM is down everywhere, use URL and ARN from your team or DR documentation on `zoa targets` / `zoa session` instead.
 

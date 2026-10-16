@@ -8,10 +8,10 @@ from a PR into that environment.
 
 ZOA has two independent test suites that compose via Makefile targets:
 
-| Suite          | Path                    | What it validates                                                      | Requires                     |
-| -------------- | ----------------------- | ---------------------------------------------------------------------- | ---------------------------- |
-| **Functional** | `test/e2e/`             | ZOA CLI, Trusted Actions, executor, RBAC, cooldown, audit, CLI output  | `ZOA_RC_API_URL` and/or `ZOA_MC_API_URL` |
-| **Monitoring** | `test/e2e-monitoring/`  | Observability pipeline — metrics in Thanos, recording rules, alerts    | `RHOBS_API_URL` (required) |
+| Suite          | Path                   | What it validates                                                     | Requires                                 |
+| -------------- | ---------------------- | --------------------------------------------------------------------- | ---------------------------------------- |
+| **Functional** | `test/e2e/`            | ZOA CLI, Trusted Actions, executor, RBAC, cooldown, audit, CLI output | `ZOA_RC_API_URL` and/or `ZOA_MC_API_URL` |
+| **Monitoring** | `test/e2e-monitoring/` | Observability pipeline — metrics in Thanos, recording rules, alerts   | `RHOBS_API_URL` (required)               |
 
 Both suites use **Ginkgo labels** to define scope:
 
@@ -81,12 +81,12 @@ your code changes.
 
 ### Image Naming Reference
 
-| Source | Image Tag Format | Registry |
-|--------|------------------|----------|
-| **PR builds** (Tekton) | `on-pr-<commit-sha>` | `quay.io/redhat-user-workloads/rosa-tenant/zoa-lambda` |
-| **Main branch** (Tekton) | `<commit-sha>` | `quay.io/redhat-user-workloads/rosa-tenant/zoa-lambda` |
-| **Dev builds** (local) | `latest` or `<commit-sha>` | `quay.io/rrp-dev-ci/zoa-lambda` |
-| **Manual** | Any tag you choose | Your quay.io namespace |
+| Source                   | Image Tag Format           | Registry                                               |
+| ------------------------ | -------------------------- | ------------------------------------------------------ |
+| **PR builds** (Tekton)   | `on-pr-<commit-sha>`       | `quay.io/redhat-user-workloads/rosa-tenant/zoa-lambda` |
+| **Main branch** (Tekton) | `<commit-sha>`             | `quay.io/redhat-user-workloads/rosa-tenant/zoa-lambda` |
+| **Dev builds** (local)   | `latest` or `<commit-sha>` | `quay.io/rrp-dev-ci/zoa-lambda`                        |
+| **Manual**               | Any tag you choose         | Your quay.io namespace                                 |
 
 PR images expire after 5 days. Main-branch and dev images persist indefinitely.
 
@@ -195,6 +195,7 @@ not API/TA code, skip the image build steps entirely — the existing Lambda is 
 need the tests to use your branch (via `ZOA_REF`).
 
 **Notes:**
+
 - The `.ephemeral-env/` directory is gitignored and only affects your local machine
 - PR images expire after 5 days (sufficient for testing)
 - **Do not create draft PRs** - Konflux builds may not trigger for drafts; use `do-not-merge/hold` label instead
@@ -207,11 +208,11 @@ need the tests to use your branch (via `ZOA_REF`).
 
 ### When is image management automatic?
 
-| Scenario | Image management |
-| --- | --- |
+| Scenario                        | Image management                                                                          |
+| ------------------------------- | ----------------------------------------------------------------------------------------- |
 | **CI `on-demand-e2e`** (ZOA PR) | Automatic — ci-operator builds images, pushes to Quay, and overrides config before deploy |
-| **CI `nightly-ephemeral`** | None — tests whatever tags are already pinned in `rosa-hyperfleet@main` config |
-| **Local dev testing** | **Manual** — you build, push, configure, and resync (steps above) |
+| **CI `nightly-ephemeral`**      | None — tests whatever tags are already pinned in `rosa-hyperfleet@main` config            |
+| **Local dev testing**           | **Manual** — you build, push, configure, and resync (steps above)                         |
 
 ## Running the Tests
 
@@ -315,10 +316,10 @@ make test-e2e
 
 `ta_mustgather_test.go` exercises async platform collection on the endpoint under test:
 
-| Target | CLI | Tarball marker |
-| ------ | --- | -------------- |
-| RC | `--gather rc` | `rc/namespaces/platform-api/` |
-| MC | `--gather mc` | `mc/namespaces/kube-applier/` |
+| Target | CLI           | Tarball marker                |
+| ------ | ------------- | ----------------------------- |
+| RC     | `--gather rc` | `rc/namespaces/platform-api/` |
+| MC     | `--gather mc` | `mc/namespaces/kube-applier/` |
 
 The happy-path spec runs `must_gather --wait` (up to 20m), downloads `output.tar.gz` via
 `zoa download`, and asserts the deployment-specific namespace path exists while the opposite
@@ -342,10 +343,10 @@ same session without conflicting.
 The test suite defaults to `rrp-rc` and `rrp-mc` (the names used inside CI containers and
 `make ephemeral-zoa-e2e`). On your host, ephemeral dev accounts use different names:
 
-| Test suite default | Your host profile      | Purpose                               |
-| ------------------ | ---------------------- | ------------------------------------- |
-| `rrp-rc`           | `rrp-regional-dev`     | RC account — invoke RC ZOA Lambda     |
-| `rrp-mc`           | `rrp-management-dev`   | MC account — invoke MC ZOA Lambda     |
+| Test suite default | Your host profile    | Purpose                           |
+| ------------------ | -------------------- | --------------------------------- |
+| `rrp-rc`           | `rrp-regional-dev`   | RC account — invoke RC ZOA Lambda |
+| `rrp-mc`           | `rrp-management-dev` | MC account — invoke MC ZOA Lambda |
 
 Override with `ZOA_RC_AWS_PROFILE` / `ZOA_MC_AWS_PROFILE` when running from your host.
 Inside CI containers or `make ephemeral-zoa-e2e`, the defaults (`rrp-rc`/`rrp-mc`) are correct —
@@ -379,11 +380,11 @@ This ensures:
 
 ### Credential Setup per Scenario
 
-| Scenario                                                   | Who manages credentials                                                                                                                           |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `make ephemeral-zoa-e2e ID=...` (from `rosa-hyperfleet`)   | Automatic — `ephemeral-env.sh` maps your host profiles → `rrp-rc`/`rrp-mc` inside the container                                                  |
-| `make test-e2e` (from this repo directly)                  | Manual — set `ZOA_RC_AWS_PROFILE=rrp-regional-dev` and `ZOA_MC_AWS_PROFILE=rrp-management-dev`                                                   |
-| CI (`nightly-ephemeral`, `on-demand-e2e`)                  | Automatic — Vault `aws_config` includes `rrp-central`, `rrp-rc`, and `rrp-mc`; today's Lambda e2e uses only `rrp-rc`/`rrp-mc` (direct Function URLs) |
+| Scenario                                                 | Who manages credentials                                                                                                                              |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `make ephemeral-zoa-e2e ID=...` (from `rosa-hyperfleet`) | Automatic — `ephemeral-env.sh` maps your host profiles → `rrp-rc`/`rrp-mc` inside the container                                                      |
+| `make test-e2e` (from this repo directly)                | Manual — set `ZOA_RC_AWS_PROFILE=rrp-regional-dev` and `ZOA_MC_AWS_PROFILE=rrp-management-dev`                                                       |
+| CI (`nightly-ephemeral`, `on-demand-e2e`)                | Automatic — Vault `aws_config` includes `rrp-central`, `rrp-rc`, and `rrp-mc`; today's Lambda e2e uses only `rrp-rc`/`rrp-mc` (direct Function URLs) |
 
 ### ZOA Access / Boundary e2e (future)
 
@@ -395,7 +396,7 @@ When adding Access/Boundary e2e specs:
 - Local dev: **`rrp-central-dev`** / **`rrp-ephemeral-central`** mapped to container **`rrp-central`** (already done in `ephemeral-env.sh` for central; extend e2e env when tests land).
 - **Integration/stage** nightly secrets today ship `rrp-rc` + customer profiles only — add **`rrp-central`** to those Vault `aws_config` blobs when standing envs run Access e2e (same pattern as ephemeral creds).
 
-| Smoke via `rosa-hyperfleet`/`rosa-hyperfleet-api` CI jobs  | Automatic — same Prow secret; `rosa-hyperfleet/ci/e2e-tests.sh` sets profiles, then calls `make test-e2e-smoke`                                   |
+| Smoke via `rosa-hyperfleet`/`rosa-hyperfleet-api` CI jobs | Automatic — same Prow secret; `rosa-hyperfleet/ci/e2e-tests.sh` sets profiles, then calls `make test-e2e-smoke` |
 
 ## CI: How It Runs
 
@@ -454,14 +455,14 @@ for the full image override mechanism.
 
 ## Troubleshooting
 
-| Symptom                                                                       | Cause                                                            | Fix                                                                                                                         |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `no target configured` test failure                                           | Neither `ZOA_RC_API_URL` nor `ZOA_MC_API_URL` is set             | Export at least one URL before running `make test-e2e`                                                                      |
-| MC specs don't run, only RC                                                   | `ZOA_MC_API_URL` not set — env may not have an MC provisioned    | Set `ZOA_MC_API_URL`; if using `make ephemeral-zoa-e2e`, MC should always be available                                      |
-| `InvalidSignatureException` or `AccessDeniedException` on MC calls            | Using the RC profile to call the MC Lambda (different AWS account) | Set `ZOA_MC_AWS_PROFILE=rrp-management-dev` (or your MC profile); verify with `AWS_PROFILE=<profile> aws sts get-caller-identity` |
-| `InvalidSignatureException` or `AccessDeniedException` on RC calls            | Wrong profile for the RC account                                 | Set `ZOA_RC_AWS_PROFILE=rrp-regional-dev` (or your RC profile); verify with `AWS_PROFILE=<profile> aws sts get-caller-identity`   |
-| `make ephemeral-zoa-e2e` fails to clone with a branch-not-found error         | `ZOA_REF` points at a branch that hasn't been pushed             | Push your branch first — this clones from the remote, not your local working tree                                           |
-| Monitoring suite fails                                                         | `RHOBS_API_URL` not set                                          | Export `RHOBS_API_URL`; get it from `make ephemeral-list` in `rosa-hyperfleet`. Use `test-e2e-zoa` to skip monitoring.       |
-| Monitoring specs fail with `403 Forbidden`                                     | SigV4 signing failed — wrong profile or expired session          | Verify with `awscurl --service execute-api --region us-east-1 "$RHOBS_API_URL/api/v1/query?query=up"` using the RC profile  |
-| Monitoring specs timeout on `Eventually` for metrics                           | CloudWatch pipeline lag > 5 min (transient)                      | Retry; if persistent, check YACE pod health: `oc get pod -n cloudwatch-exporter`                                            |
-| Monitoring log shows `panic: test timed out` with only dots (older Makefile)     | Former `go test -timeout 7m` killed the package mid-`Eventually` | Use ginkgo runner on `main`; logs show failing spec; tune `E2E_MONITORING_TIMEOUT` if needed                                |
+| Symptom                                                                      | Cause                                                              | Fix                                                                                                                               |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `no target configured` test failure                                          | Neither `ZOA_RC_API_URL` nor `ZOA_MC_API_URL` is set               | Export at least one URL before running `make test-e2e`                                                                            |
+| MC specs don't run, only RC                                                  | `ZOA_MC_API_URL` not set — env may not have an MC provisioned      | Set `ZOA_MC_API_URL`; if using `make ephemeral-zoa-e2e`, MC should always be available                                            |
+| `InvalidSignatureException` or `AccessDeniedException` on MC calls           | Using the RC profile to call the MC Lambda (different AWS account) | Set `ZOA_MC_AWS_PROFILE=rrp-management-dev` (or your MC profile); verify with `AWS_PROFILE=<profile> aws sts get-caller-identity` |
+| `InvalidSignatureException` or `AccessDeniedException` on RC calls           | Wrong profile for the RC account                                   | Set `ZOA_RC_AWS_PROFILE=rrp-regional-dev` (or your RC profile); verify with `AWS_PROFILE=<profile> aws sts get-caller-identity`   |
+| `make ephemeral-zoa-e2e` fails to clone with a branch-not-found error        | `ZOA_REF` points at a branch that hasn't been pushed               | Push your branch first — this clones from the remote, not your local working tree                                                 |
+| Monitoring suite fails                                                       | `RHOBS_API_URL` not set                                            | Export `RHOBS_API_URL`; get it from `make ephemeral-list` in `rosa-hyperfleet`. Use `test-e2e-zoa` to skip monitoring.            |
+| Monitoring specs fail with `403 Forbidden`                                   | SigV4 signing failed — wrong profile or expired session            | Verify with `awscurl --service execute-api --region us-east-1 "$RHOBS_API_URL/api/v1/query?query=up"` using the RC profile        |
+| Monitoring specs timeout on `Eventually` for metrics                         | CloudWatch pipeline lag > 5 min (transient)                        | Retry; if persistent, check YACE pod health: `oc get pod -n cloudwatch-exporter`                                                  |
+| Monitoring log shows `panic: test timed out` with only dots (older Makefile) | Former `go test -timeout 7m` killed the package mid-`Eventually`   | Use ginkgo runner on `main`; logs show failing spec; tune `E2E_MONITORING_TIMEOUT` if needed                                      |

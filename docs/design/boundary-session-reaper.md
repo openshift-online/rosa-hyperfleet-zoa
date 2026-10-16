@@ -1,71 +1,74 @@
-# ZOA Boundary — Session reaper and exec session tracking
+# ZOA Boundary — Session reaper
 
-The **Worker Lambda** in each target VPC runs a **boundary session reaper** on the same EventBridge schedule as the TA reconciler/GC. It stops orphaned **ECS Fargate** boundary tasks and marks DynamoDB session rows **terminated** when policy says the session is done.
+The **Worker Lambda** in each target VPC runs a **boundary session reaper** on the same EventBridge schedule as the TA reconciler/GC (`route: reaper`). It stops orphaned **ECS Fargate** boundary tasks and marks DynamoDB session rows **`terminated`** when policy says the session is done.
 
 Implementation: `pkg/scheduler/reaper.go`, `pkg/boundaryexec/activity.go`, `pkg/store/session.go`, wired from `cmd/zoa-lambda/main.go` when `SESSIONS_TABLE` is set.
 
-## Two independent policies
+## Three ways a session ends
 
-| Policy                      | Question                                             | Enforced by                                  | Stop reason          |
-| --------------------------- | ---------------------------------------------------- | -------------------------------------------- | -------------------- |
-| **Deadline (max duration)** | Has the session lived longer than its `deadline`?    | `ListExpired` on GSI `status-deadline-index` | `deadlineReaperStop` |
-| **Idle (no usage)**         | Has ECS Exec terminal activity been absent too long? | SSM + CloudWatch (+ optional Dynamo hints)   | `idleReaperStop`     |
+| Path                        | Who stops the task?                                                           | `stop_reason` in DynamoDB |
+| --------------------------- | ----------------------------------------------------------------------------- | ------------------------- |
+| **Operator terminate**      | SRE on laptop: `zoa session terminate <deployment>/<session-id>` (Access API) | `operatorStop`            |
+| **Max duration (deadline)** | Worker reaper                                                                 | `deadlineReaperStop`      |
+| **Idle (no Exec activity)** | Worker reaper                                                                 | `idleReaperStop`          |
 
-Both run in one `Reaper.Run()` pass: **deadline first**, then **idle**. Each Worker instance scopes to **`TARGET_CLUSTER`** for its VPC so RC and MC workers do not cross-stop tasks.
+Provisioning failures may set **`provisionFailed`** when the session never becomes active (`pkg/store/session.go`).
+
+**Leaving the Exec shell** (`exit`, Ctrl+D) does **not** stop the task. Only **terminate**, **deadline reaper**, or **idle reaper** ends the ECS task.
+
+## Two reaper policies (Worker only)
+
+Both run in one `Reaper.Run()` pass: **deadline first**, then **idle**. Each Worker scopes to **`TARGET_CLUSTER`** for its VPC.
+
+| Policy       | Question                                             | Data source                                     | `stop_reason`        |
+| ------------ | ---------------------------------------------------- | ----------------------------------------------- | -------------------- |
+| **Deadline** | Has `now` passed session **`deadline`**?             | GSI **`status-deadline-index`** (`ListExpired`) | `deadlineReaperStop` |
+| **Idle**     | Has ECS Exec terminal activity been absent too long? | SSM + CloudWatch Logs                           | `idleReaperStop`     |
 
 ### Deadline
 
-- Set on **session start** (Access Lambda): default length from **`SESSION_MAX_DURATION_HOURS`** (default **4**, Access env). Optional JSON `timeout_hours` on start is capped by the same value.
-- Stored on the session row as RFC3339 `deadline`.
-- Reaper does not interpret env at stop time — only the stored deadline.
+- Set on **session start** (Access Lambda): default from **`SESSION_MAX_DURATION_HOURS`** (default **4**). Optional `timeout_hours` on start is capped by the same value.
+- Stored as RFC3339 **`deadline`** on the session row.
+- Reaper reads the stored value only (not env at stop time).
 
 ### Idle
 
-- Configured on the **Worker** via **`SESSION_IDLE_TIMEOUT_SECONDS`** (default **3600**).
+- Configured on the **Worker** via **`SESSION_IDLE_TIMEOUT_SECONDS`** (default **3600**), rendered from hyperfleet `zoa_boundary_session_idle_timeout_seconds`.
 - **Activity source of truth is AWS**, not DynamoDB:
-  1. **SSM** `DescribeSessions` (history) for `AmazonECS-ExecuteInteractiveCommand` sessions whose target contains the ECS **task id** and `zoa-boundary`.
-  2. **CloudWatch Logs** `DescribeLogStreams` on `/ecs/<target_cluster>/zoa-boundary/ssm-sessions` for streams `ecs-execute-command-<id>` (merged from SSM ids and optional Dynamo hints).
+  1. **SSM** `DescribeSessions` for `AmazonECS-ExecuteInteractiveCommand` targeting the ECS **task id** and `zoa-boundary`.
+  2. **CloudWatch Logs** `DescribeLogStreams` on `/ecs/<target_cluster>/zoa-boundary/ssm-sessions` for streams `ecs-execute-command-<id>`.
   3. Latest `lastEventTimestamp` across those streams = last terminal activity.
 - **If exec activity exists** and last activity is older than the idle window → terminate.
-- **If no exec sessions exist at AWS** for the task (never joined, or CLI failed before logs exist) → terminate when **`createdAt`** is older than the idle window. This catches tasks started but never used without requiring `execSessionIds` in DynamoDB.
-- Sessions without `taskId` / `targetCluster` are skipped (still provisioning or failed).
+- **If no exec sessions exist** for the task → terminate when **`createdAt`** is older than the idle window (never joined, or join before logs exist).
+- Sessions without **`taskId`** / **`targetCluster`** are skipped.
 
-**Design choice:** `execSessionIds` in DynamoDB is a **forensics hint** (correlate streams quickly). Idle enforcement does **not** require the CLI to call `exec-attached`.
+**`execSessionIds` in DynamoDB** is a **forensics hint** only. Idle enforcement does not require the CLI `exec-attached` call.
 
 ## Exec session registration (`POST /api/v0/sessions/exec-attached/{id}`)
 
-After `ecs:ExecuteCommand` succeeds, the laptop CLI calls Access to append the SSM session id to **`execSessionIds`** (stream name form). Flow:
-
-1. `POST /sessions/join/{id}` → vended exec credentials + `exec_command`
-2. CLI `ExecuteCommand` → SSM session id
-3. **`POST /sessions/exec-attached/{id}`** → Dynamo append (owner + active session only)
-4. `session-manager-plugin` → interactive shell
-
-If step 3 fails, the CLI **warns on stderr** and still opens the shell (`internal/cli/session_exec.go`, `internal/ecsexec/join.go`). Reaper idle logic still works via SSM/CW.
+After `ecs:ExecuteCommand` succeeds, the laptop CLI appends the SSM session id to **`execSessionIds`**. If the call fails, the CLI warns and still opens the shell (`internal/cli/session_exec.go`). See [session logging](boundary-session-logging.md).
 
 ## RunTask environment (catalog + Claude context)
 
 Access injects at `RunTask` (in addition to task-definition defaults):
 
-| Env                                           | Purpose                                                                        |
-| --------------------------------------------- | ------------------------------------------------------------------------------ |
-| `ZOA_TARGET_TYPE`                             | `rc` or `mc` (lowercased from target metadata) — selects baked TA catalog file |
-| `ZOA_SESSION_ID` / `ZOA_OPERATOR`             | Session facts in `ZOA_SESSION.md`                                              |
-| `ZOA_API_URL`, `ZOA_TARGET`, `ZOA_DEPLOYMENT` | Existing boundary wiring                                                       |
+| Env                                              | Purpose                                        |
+| ------------------------------------------------ | ---------------------------------------------- |
+| `ZOA_TARGET_TYPE`                                | `rc` or `mc` — selects baked TA catalog file   |
+| `ZOA_SESSION_ID` / `ZOA_OPERATOR` / `ZOA_REASON` | Shell and Claude context (not API audit truth) |
+| `ZOA_API_URL`, `ZOA_TARGET`, `ZOA_DEPLOYMENT`    | API plane wiring                               |
 
-Entrypoint copies `/usr/share/zoa/catalog/ZOA_ACTIONS.{rc|mc}.md` → `/home/sre/.claude/ZOA_ACTIONS.md`. Regenerate catalogs with `go run ./hack/generate-boundary-catalog/` after TA metadata changes.
+Entrypoint copies `/usr/share/zoa/catalog/ZOA_ACTIONS.{rc|mc}.md` → `/home/sre/.claude/ZOA_ACTIONS.md`.
 
 ## Terraform / IAM (rosa-hyperfleet)
 
 - Worker env: `SESSION_IDLE_TIMEOUT_SECONDS` when `sessions_table_name` is set (`terraform/modules/zoa-lambda`).
-- Worker IAM: `ssm:DescribeSessions`, `logs:DescribeLogStreams` on `.../zoa-boundary/ssm-sessions` (`lambda_boundary_reaper_idle`).
+- Worker IAM: `ssm:DescribeSessions`, `logs:DescribeLogStreams` on `.../zoa-boundary/ssm-sessions`.
 - Access env: `SESSION_MAX_DURATION_HOURS` (`terraform/modules/zoa-access`).
 
 ## Operational notes
 
-- **Leaving the Exec shell** does not stop the task; only **session stop**, **deadline reaper**, or **idle reaper** does.
-- **Idle baseline `createdAt`** includes task provisioning time; very slow `RunTask` reduces time-to-idle-reap before first join.
-- **SSM history pagination** is capped (20 pages); sufficient for dev/ephemeral; revisit at high join churn.
-- Roll back feature bundle: git parent before `feat(boundary): idle reaper, exec session tracking, and CLI/catalog UX` on `feat/zoa-boundary`.
+- **Idle baseline `createdAt`** includes task provisioning time; slow `RunTask` reduces time before idle reap if the operator never joins.
+- **SSM history pagination** is capped (20 pages); revisit at very high join churn.
 
-See also [boundary session logging](boundary-session-logging.md), [operator workflow](../guides/operator-workflow.md), [boundary architecture](../boundary/architecture.md).
+See also [session logging](boundary-session-logging.md), [operator workflow](../guides/operator-workflow.md), [boundary architecture](../boundary/architecture.md).

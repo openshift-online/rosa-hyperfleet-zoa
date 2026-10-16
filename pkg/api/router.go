@@ -65,7 +65,7 @@ func WithSessionStore(s store.SessionStore) HandlerOption {
 }
 
 // resolveIdentity returns operator, signer_arn, and session_id for audit/executions.
-// See ResolveIdentity and docs/design/boundary-identity-and-storage.md.
+// See ResolveIdentity and docs/design/boundary-identity-bridge.md.
 func (h *Handler) resolveIdentity(r *http.Request) (operator, signerARN, sessionID string) {
 	signerARN = r.Header.Get("X-Operator")
 

@@ -4,11 +4,11 @@
 
 ZOA deploys **multiple Lambda functions per deployment**:
 
-| Lambda | Trigger | Purpose |
-|---|---|---|
-| **API** | Function URL (IAM auth) | CLI requests, sync TAs, streaming downloads (per VPC: RC + each MC) |
+| Lambda     | Trigger                   | Purpose                                                                                 |
+| ---------- | ------------------------- | --------------------------------------------------------------------------------------- |
+| **API**    | Function URL (IAM auth)   | CLI requests, sync TAs, streaming downloads (per VPC: RC + each MC)                     |
 | **Worker** | EventBridge + self-invoke | Reconciler (1m), GC (5m), **boundary session reaper** (5m), async/approved TA execution |
-| **Access** | Function URL (IAM auth) | ZOA boundary session lifecycle, target discovery (RC account, no VPC) |
+| **Access** | Function URL (IAM auth)   | ZOA boundary session lifecycle, target discovery (RC account, no VPC)                   |
 
 API, Worker, and Access use the **same container image** (`zoa-lambda`), differentiated by the `HANDLER_MODE` environment variable (`api`, `worker`, `access`).
 
@@ -16,11 +16,11 @@ API, Worker, and Access use the **same container image** (`zoa-lambda`), differe
 
 Each Lambda has different operational characteristics that are per-function AWS settings:
 
-| Setting | API | Worker | Access |
-|---------|-----|--------|--------|
-| Invocation | Function URL (streaming) | EventBridge + self-invoke | Function URL (standard) |
-| VPC | Yes (EKS access) | Yes (EKS access) | No (ECS RunTask, DynamoDB only) |
-| Throttle behavior | HTTP 429 to caller | AWS queues + retries (up to 6h) | HTTP 429 to caller |
+| Setting           | API                      | Worker                          | Access                          |
+| ----------------- | ------------------------ | ------------------------------- | ------------------------------- |
+| Invocation        | Function URL (streaming) | EventBridge + self-invoke       | Function URL (standard)         |
+| VPC               | Yes (EKS access)         | Yes (EKS access)                | No (ECS RunTask, DynamoDB only) |
+| Throttle behavior | HTTP 429 to caller       | AWS queues + retries (up to 6h) | HTTP 429 to caller              |
 
 These cannot share a single function because timeout, concurrency, invocation mode (streaming vs standard handler), and VPC attachment are per-function settings.
 
@@ -37,7 +37,7 @@ The Worker Lambda uses the `route` field in the event payload:
 {"route": "execute", "execution_id": "abc123"}
 ```
 
-The **reaper** route scans DynamoDB for boundary sessions past their deadline and calls `ecs:StopTask` on the matching boundary ECS cluster (implemented in `pkg/scheduler/reaper.go`, scheduled from `terraform/modules/zoa-lambda/main.tf`).
+The **reaper** route enforces boundary **deadline** and **idle** policies: scans DynamoDB, correlates ECS Exec activity via SSM/CloudWatch, and calls `ecs:StopTask` when needed (`pkg/scheduler/reaper.go`, scheduled from `terraform/modules/zoa-lambda/main.tf`). See [session reaper](../design/boundary-session-reaper.md).
 
 ## Self-Invocation Pattern
 
@@ -70,18 +70,19 @@ See `terraform/modules/zoa-lambda/variables.tf` for current values.
 
 Each route gets a `context.WithTimeout` enforced in code:
 
-| Route | Deadline | Why |
-|---|---|---|
-| `reconciler` | 55s | Must finish quickly; runs every 60s |
-| `gc` | 55s | Cleanup can be deferred; runs every 5min |
-| `reaper` | 55s | Session enforcement; runs every 5min |
-| `execute` | 295s | TA execution; bounded by Lambda timeout |
+| Route        | Deadline | Why                                      |
+| ------------ | -------- | ---------------------------------------- |
+| `reconciler` | 55s      | Must finish quickly; runs every 60s      |
+| `gc`         | 55s      | Cleanup can be deferred; runs every 5min |
+| `reaper`     | 55s      | Session enforcement; runs every 5min     |
+| `execute`    | 295s     | TA execution; bounded by Lambda timeout  |
 
 All values are **env-var tunable** without code redeployment.
 
 ## Batch Limits
 
 Each scheduled phase processes at most `MAX_BATCH_PER_TICK` items (default 30). If:
+
 - The batch limit is reached, or
 - `ctx.Err() != nil` (deadline approaching)
 
@@ -108,6 +109,7 @@ graph TD
 ## Cross-Account Access (MC Lambdas)
 
 MC Lambdas access RC data layer (DynamoDB, S3, KMS) via resource-based policies:
+
 - DynamoDB: `aws_dynamodb_resource_policy` allowing the MC Lambda role
 - S3: Bucket policy with `AllowCrossAccountLambdaAccess`
 - KMS: Key policy with `AllowCrossAccountLambdaKMS`
@@ -116,12 +118,12 @@ No STS AssumeRole needed for data access — policies are on the resources thems
 
 ## Design Decisions
 
-| Decision | Rationale |
-|---|---|
-| Self-invoke over SQS | Simpler (no queue config), automatic retries, Lambda handles backpressure |
-| Reserved concurrency | Prevents noisy-neighbor issues; caps cost |
-| 300s Lambda timeout | Gives 295s for code; handles slow TAs without hitting AWS 900s limit |
-| Same binary | Zero divergence; route by env var + event payload |
-| Access via Function URL | IAM auth without API Gateway; SSM publishes URL for CLI discovery |
-| EMF metrics | CW Exporter already scrapes CloudWatch; EMF is zero-config |
-| SQS DLQ | Catch failures from EventBridge and self-invocations |
+| Decision                | Rationale                                                                 |
+| ----------------------- | ------------------------------------------------------------------------- |
+| Self-invoke over SQS    | Simpler (no queue config), automatic retries, Lambda handles backpressure |
+| Reserved concurrency    | Prevents noisy-neighbor issues; caps cost                                 |
+| 300s Lambda timeout     | Gives 295s for code; handles slow TAs without hitting AWS 900s limit      |
+| Same binary             | Zero divergence; route by env var + event payload                         |
+| Access via Function URL | IAM auth without API Gateway; SSM publishes URL for CLI discovery         |
+| EMF metrics             | CW Exporter already scrapes CloudWatch; EMF is zero-config                |
+| SQS DLQ                 | Catch failures from EventBridge and self-invocations                      |

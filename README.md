@@ -12,11 +12,11 @@ This repository is the source of truth for the ZOA **framework**: CLI, Lambdas, 
 
 ZOA is built on three operational pillars. The boundary is always the entry point — TAs and break-glass run from inside it.
 
-| Pillar | Status | What it is | How operators use it |
-|--------|--------|------------|---------------------|
-| **Boundary** | ✅ Shipped | Ephemeral ECS Fargate task in the target VPC — the **entry point** for all operator work | SRE starts a session with a reason (Jira/PD), works in ECS Exec, runs TAs from inside. Reaped on deadline or idle. |
-| **Trusted Actions** | ✅ Shipped | Pre-defined, RBAC-scoped Go operations invoked via `zoa run` from the boundary | The **only supported way** to read or change fleet state. Each TA creates an ephemeral ServiceAccount + Role, destroyed on completion. |
-| **Break-glass** | 🔲 Planned | Scoped emergency `kubectl`/`aws` from the boundary, approval-gated | For situations no TA covers. Not implemented — see [break-glass/README.md](docs/break-glass/README.md). |
+| Pillar              | Status     | What it is                                                                               | How operators use it                                                                                                                   |
+| ------------------- | ---------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Boundary**        | ✅ Shipped | Ephemeral ECS Fargate task in the target VPC — the **entry point** for all operator work | SRE starts a session with a reason (Jira/PD), works in ECS Exec, runs TAs from inside. Reaped on deadline or idle.                     |
+| **Trusted Actions** | ✅ Shipped | Pre-defined, RBAC-scoped Go operations invoked via `zoa run` from the boundary           | The **only supported way** to read or change fleet state. Each TA creates an ephemeral ServiceAccount + Role, destroyed on completion. |
+| **Break-glass**     | 🔲 Planned | Scoped emergency `kubectl`/`aws` from the boundary, approval-gated                       | For situations no TA covers. Not implemented — see [break-glass/README.md](docs/break-glass/README.md).                                |
 
 **Every operator path starts with `zoa session start`** — there is no laptop-side `kubectl` or `zoa run`. The boundary is the shell; TAs and (future) break-glass are what you do inside it.
 
@@ -24,15 +24,15 @@ ZOA is built on three operational pillars. The boundary is always the entry poin
 
 ## Components
 
-| Component | Artifact | Runs on | Pillar |
-|-----------|----------|---------|--------|
-| **CLI (`zoa`)** | `zoa` binary | SRE laptop · boundary task | All — **session lifecycle** on the laptop; **TA execution** from inside the boundary |
-| **ZOA Boundary** | `zoa-boundary` image | ECS Fargate (per target VPC) | Boundary — audited operator environment; ECS Exec transcript to CloudWatch |
-| **Access Lambda** | `zoa-lambda` image (`HANDLER_MODE=access`) | Lambda (RC account, no VPC) | Boundary — session plane: start/terminate/list/history, targets; `ecs:RunTask` |
-| **API Lambda** | `zoa-lambda` image (`HANDLER_MODE=api`) | Lambda (per target VPC) | TAs — execution plane: `zoa run`, sync TAs, audit reads; **identity bridge** (task ARN → session → operator) |
-| **Worker Lambda** | `zoa-lambda` image (`HANDLER_MODE=worker`) | Lambda (per target VPC) | Boundary + TAs — reconciler, GC, async TA dispatch, session **reaper** |
-| **Async runner** | `zoa-runner` image | K8s Job (target EKS) | TAs — long-running async TAs; uploads to S3 |
-| **Trusted Actions** | Go packages (`pkg/actions/`, compiled into Lambda/runner/boundary) | Lambda + runner + boundary catalog | TAs — RBAC-scoped operations invoked via `zoa run` from the boundary |
+| Component           | Artifact                                                           | Runs on                            | Pillar                                                                                                       |
+| ------------------- | ------------------------------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **CLI (`zoa`)**     | `zoa` binary                                                       | SRE laptop · boundary task         | All — **session lifecycle** on the laptop; **TA execution** from inside the boundary                         |
+| **ZOA Boundary**    | `zoa-boundary` image                                               | ECS Fargate (per target VPC)       | Boundary — audited operator environment; ECS Exec transcript to CloudWatch                                   |
+| **Access Lambda**   | `zoa-lambda` image (`HANDLER_MODE=access`)                         | Lambda (RC account, no VPC)        | Boundary — session plane: start/terminate/list/history, targets; `ecs:RunTask`                               |
+| **API Lambda**      | `zoa-lambda` image (`HANDLER_MODE=api`)                            | Lambda (per target VPC)            | TAs — execution plane: `zoa run`, sync TAs, audit reads; **identity bridge** (task ARN → session → operator) |
+| **Worker Lambda**   | `zoa-lambda` image (`HANDLER_MODE=worker`)                         | Lambda (per target VPC)            | Boundary + TAs — reconciler, GC, async TA dispatch, session **reaper**                                       |
+| **Async runner**    | `zoa-runner` image                                                 | K8s Job (target EKS)               | TAs — long-running async TAs; uploads to S3                                                                  |
+| **Trusted Actions** | Go packages (`pkg/actions/`, compiled into Lambda/runner/boundary) | Lambda + runner + boundary catalog | TAs — RBAC-scoped operations invoked via `zoa run` from the boundary                                         |
 
 **Three images** from this repo: **`zoa-lambda`** (one binary, three `HANDLER_MODE`s), **`zoa-runner`** (async TAs in EKS Jobs), **`zoa-boundary`** (audited operator shell).
 
@@ -62,12 +62,12 @@ ZOA is built on three operational pillars. The boundary is always the entry poin
 
 **Operator path (sessions + TAs):**
 
-| Component | Scope | On failure |
-|-----------|-------|------------|
-| **Lambda** | **Central (RC account):** Access — sessions, targets, `RunTask`. **Per target VPC:** API — sync `zoa run`; Worker — reconciler, GC, reaper, async dispatch (same `zoa-lambda` image, different `HANDLER_MODE`) | **Central:** cannot start/join/list sessions or resolve targets from the laptop; running boundary tasks may still `zoa run` if that VPC's API is up. **Per VPC:** that cluster's TAs and scheduled worker work stop; other clusters unaffected |
-| **ECS Fargate (boundary)** | Per target VPC | Cannot start or attach to a new session; in-flight Exec may disconnect; task keeps running until reaper or `session terminate` |
-| **DynamoDB** | Regional (sessions, executions, audit) | Cannot record sessions or dispatch TAs; identity bridge unavailable |
-| **EKS API server** | Per cluster | TA fails; API returns error + execution logs inline |
+| Component                  | Scope                                                                                                                                                                                                          | On failure                                                                                                                                                                                                                                     |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Lambda**                 | **Central (RC account):** Access — sessions, targets, `RunTask`. **Per target VPC:** API — sync `zoa run`; Worker — reconciler, GC, reaper, async dispatch (same `zoa-lambda` image, different `HANDLER_MODE`) | **Central:** cannot start/join/list sessions or resolve targets from the laptop; running boundary tasks may still `zoa run` if that VPC's API is up. **Per VPC:** that cluster's TAs and scheduled worker work stop; other clusters unaffected |
+| **ECS Fargate (boundary)** | Per target VPC                                                                                                                                                                                                 | Cannot start or attach to a new session; in-flight Exec may disconnect; task keeps running until reaper or `session terminate`                                                                                                                 |
+| **DynamoDB**               | Regional (sessions, executions, audit)                                                                                                                                                                         | Cannot record sessions or dispatch TAs; identity bridge unavailable                                                                                                                                                                            |
+| **EKS API server**         | Per cluster                                                                                                                                                                                                    | TA fails; API returns error + execution logs inline                                                                                                                                                                                            |
 
 **Sync (auto-approved) — the common case:**
 
@@ -75,9 +75,9 @@ Output is returned **inline in the HTTP response**. S3 archival happens best-eff
 
 **Async and manual-approval paths** (adds to the above):
 
-| Component | Required by | On failure |
-|-----------|-------------|------------|
-| S3 + KMS | Async (runner uploads output) | Execution marked failed |
+| Component             | Required by                                             | On failure                                                            |
+| --------------------- | ------------------------------------------------------- | --------------------------------------------------------------------- |
+| S3 + KMS              | Async (runner uploads output)                           | Execution marked failed                                               |
 | EventBridge Scheduler | Async + manual-approval (triggers reconciler/GC/reaper) | Worker Lambda not invoked; approved TAs stuck; session reaper delayed |
 
 Composite sync availability: **~99.95%** (~22 min/month downtime budget, bottlenecked by Lambda + EKS in the target VPC). Session start additionally depends on **Lambda (Access)** and **ECS**. See [storage](docs/architecture/storage.md) for sessions and the reaper.
@@ -86,11 +86,11 @@ Composite sync availability: **~99.95%** (~22 min/month downtime budget, bottlen
 
 ZOA uses **three Lambda deployments** from one image (`HANDLER_MODE`) plus **on-demand boundary ECS** per target VPC:
 
-| Plane | Where | Role |
-|-------|-------|------|
-| **Access** | RC account (no VPC) | Sessions, targets, `RunTask`, session audit APIs |
-| **API + Worker** | Each RC/MC VPC (one EKS cluster each) | TA execution, reconciler, GC, session reaper |
-| **Boundary** | Same VPC as the session target | Operator shell; `zoa run` → API Lambda in that VPC |
+| Plane            | Where                                 | Role                                               |
+| ---------------- | ------------------------------------- | -------------------------------------------------- |
+| **Access**       | RC account (no VPC)                   | Sessions, targets, `RunTask`, session audit APIs   |
+| **API + Worker** | Each RC/MC VPC (one EKS cluster each) | TA execution, reconciler, GC, session reaper       |
+| **Boundary**     | Same VPC as the session target        | Operator shell; `zoa run` → API Lambda in that VPC |
 
 - **API Lambda** — Function URL, IAM auth, `RESPONSE_STREAM`. Serves the boundary task's `zoa` client; sync TAs run in-process.
 - **Worker Lambda** — EventBridge (1m reconciler, 5m GC, 5m boundary reaper); async TA via self-invoke + `zoa-runner` Jobs.
@@ -164,12 +164,12 @@ graph TD
 
 All modes persist execution state in DynamoDB before dispatch.
 
-| Mode | Approval | Flow |
-|------|----------|------|
-| **Sync, auto** | None | Boundary `zoa run` → API Lambda → execute in-process → output inline in HTTP response |
-| **Async, auto** | None | Boundary `zoa run` → API Lambda → K8s Job → reconciler polls → `zoa output` / S3 |
-| **Sync, manual** | Required | Boundary → API → pending → approve → reconciler → inline · *future* |
-| **Async, manual** | Required | Boundary → API → pending → approve → reconciler → Job · *future* |
+| Mode              | Approval | Flow                                                                                  |
+| ----------------- | -------- | ------------------------------------------------------------------------------------- |
+| **Sync, auto**    | None     | Boundary `zoa run` → API Lambda → execute in-process → output inline in HTTP response |
+| **Async, auto**   | None     | Boundary `zoa run` → API Lambda → K8s Job → reconciler polls → `zoa output` / S3      |
+| **Sync, manual**  | Required | Boundary → API → pending → approve → reconciler → inline · _future_                   |
+| **Async, manual** | Required | Boundary → API → pending → approve → reconciler → Job · _future_                      |
 
 **Sync output delivery**: the API response contains the TA output (on success) or execution logs (on failure) directly — no second HTTP call or S3 fetch required. S3 archival happens asynchronously for long-term retention.
 
@@ -179,10 +179,10 @@ For details on K8s resources and the streaming architecture, see [Implementation
 
 ## Container Images
 
-| Image | Containerfile | Contents | Purpose |
-|-------|---------------|----------|---------|
-| `zoa-lambda` | `Containerfile` | `zoa-lambda` binary (UBI-minimal) | Deployed as Lambda function (API + Worker + Access modes) |
-| `zoa-runner` | `Containerfile.runner` | `zoa-runner` + `zoa` CLI | Runs inside K8s Jobs for async TA execution |
+| Image          | Containerfile            | Contents                                 | Purpose                                                                                                |
+| -------------- | ------------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `zoa-lambda`   | `Containerfile`          | `zoa-lambda` binary (UBI-minimal)        | Deployed as Lambda function (API + Worker + Access modes)                                              |
+| `zoa-runner`   | `Containerfile.runner`   | `zoa-runner` + `zoa` CLI                 | Runs inside K8s Jobs for async TA execution                                                            |
 | `zoa-boundary` | `Containerfile.boundary` | `zoa` CLI + aws/kubectl/jq + Claude Code | ECS Fargate task for audited SRE sessions — see [Boundary architecture](docs/boundary/architecture.md) |
 
 ## Install the CLI
@@ -261,11 +261,11 @@ Two conformance gates ensure every Trusted Action stays tested:
 
 ZOA infrastructure (Terraform) lives in [rosa-hyperfleet](https://github.com/openshift-online/rosa-hyperfleet). Wired from `terraform/config/regional-cluster/` and `terraform/config/management-cluster/`:
 
-| Module | Where used | What it deploys |
-|--------|------------|-----------------|
-| [`zoa`](https://github.com/openshift-online/rosa-hyperfleet/tree/main/terraform/modules/zoa) | RC | DynamoDB (executions, audit, **boundary sessions**), S3 artifacts, KMS, ECR |
+| Module                                                                                                     | Where used         | What it deploys                                                                                                                                                                                          |
+| ---------------------------------------------------------------------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`zoa`](https://github.com/openshift-online/rosa-hyperfleet/tree/main/terraform/modules/zoa)               | RC                 | DynamoDB (executions, audit, **boundary sessions**), S3 artifacts, KMS, ECR                                                                                                                              |
 | [`zoa-lambda`](https://github.com/openshift-online/rosa-hyperfleet/tree/main/terraform/modules/zoa-lambda) | Each RC and MC VPC | **API + Worker Lambdas**, **boundary ECS** (Fargate task definition, log groups, boundary IAM), EventBridge, EKS access; on RC only, the **Access Lambda execution role shell** (`access-trust-role.tf`) |
-| [`zoa-access`](https://github.com/openshift-online/rosa-hyperfleet/tree/main/terraform/modules/zoa-access) | **RC only** | **Access Lambda** (Function URL), invoker role, session-plane IAM (`ecs:RunTask` into per-VPC boundary, DynamoDB sessions, SSM targets) — does **not** run the boundary container |
+| [`zoa-access`](https://github.com/openshift-online/rosa-hyperfleet/tree/main/terraform/modules/zoa-access) | **RC only**        | **Access Lambda** (Function URL), invoker role, session-plane IAM (`ecs:RunTask` into per-VPC boundary, DynamoDB sessions, SSM targets) — does **not** run the boundary container                        |
 
 MC stacks use `zoa-lambda` only and assume into RC for data; Access Lambda stays in the RC account. See module READMEs under `terraform/modules/zoa-lambda/` and `zoa-access/`.
 

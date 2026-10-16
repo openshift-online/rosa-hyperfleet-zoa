@@ -1,76 +1,118 @@
-# ZOA Boundary — ECS Exec and CloudWatch logging
+# ZOA Boundary — Session logging (CloudWatch)
 
-## Two log groups (one KMS key)
+Boundary sessions produce **two audit layers**:
 
-ZOA boundary uses **two CloudWatch log groups** encrypted with the **same CMK** (shared ZOA key on RC; per-cluster key on MC when no `kms_key_arn`).
+| Layer                       | Store                                  | Use for                                                                                                |
+| --------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **ECS Exec PTY transcript** | CloudWatch Logs (`ssm-sessions` group) | Shell forensics: commands typed, `zoa run` stdout in the session, Claude TUI output                    |
+| **ZOA application audit**   | DynamoDB **audit** + **executions**    | TA dispatch proof, parameters, operator attribution via [identity bridge](boundary-identity-bridge.md) |
 
-| Purpose               | Log group                                     | Stream naming                      | What it captures                                                        |
-| --------------------- | --------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
-| **Container stdout**  | `/ecs/<cluster_id>/zoa-boundary`              | `container/zoa-boundary/<task-id>` | Task startup script only (banner, tool check, “ready for connections”). |
-| **ECS Exec sessions** | `/ecs/<cluster_id>/zoa-boundary/ssm-sessions` | `ecs-execute-command-<session-id>` | Interactive shell I/O after `zoa session join` — bash, `zoa run`, etc.  |
+`zoa run` is recorded in DynamoDB **even if** Exec logging fails. Use **`zoa runs`** / **`zoa audit`** for TA detail; use CloudWatch for interactive shell evidence.
+
+## Log groups (per target cluster)
+
+Both groups use the **same KMS CMK** as other ZOA resources (shared key on RC; per-cluster key on MC when Terraform does not pass `kms_key_arn`). **Retention** is at least **365 days** (`max(365, boundary_log_retention_days)` in `terraform/modules/zoa-lambda/boundary-ecs.tf`).
+
+| Purpose               | Log group                                     | Stream naming                           | Contents                                                                                                           |
+| --------------------- | --------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Container stdout**  | `/ecs/<cluster_id>/zoa-boundary`              | `container/zoa-boundary/<task-id>`      | Entrypoint only: banner, tool checks, “ready for connections”.                                                     |
+| **ECS Exec sessions** | `/ecs/<cluster_id>/zoa-boundary/ssm-sessions` | `ecs-execute-command-<exec-session-id>` | One stream **per Exec join** (each `zoa session join`); shared log group across all boundary tasks on that cluster |
 
 `<cluster_id>` is the HyperFleet cluster id (`regional_id` on RC, `management_id` on MC).
 
-**Do not** search session content in the container group. **Do not** use the exec group for “did the task start?” — use container logs.
+**Do not** search session transcripts in the **container** group. **Do not** use the exec group to debug task startup — use the container group.
 
-Terraform: `terraform/modules/zoa-lambda/` in [rosa-hyperfleet](https://github.com/openshift-online/rosa-hyperfleet) (`boundary-ecs.tf`, `boundary-task.tf`; see module `README.md`).
+Terraform: [rosa-hyperfleet `terraform/modules/zoa-lambda/`](https://github.com/openshift-online/rosa-hyperfleet/tree/main/terraform/modules/zoa-lambda) (`boundary-ecs.tf`, `boundary-task.tf`).
 
-FedRAMP AU-09: exec group + KMS + `cloudWatchEncryptionEnabled = true` on cluster `executeCommandConfiguration`.
+FedRAMP AU-09: dedicated exec log group, KMS encryption, `cloudWatchEncryptionEnabled = true` on the ECS cluster `executeCommandConfiguration`.
 
-## AWS requirements
+## What Exec PTY logging captures
 
-From [Monitor Amazon ECS Exec commands using CloudWatch Logs](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-exec-logging.html):
+- Interactive shell input and output (including `zoa run` printed in the session).
+- **Claude Code** TUI: partial terminal capture; model payloads are **not** in Exec logs. Optional [Bedrock model invocation logging](https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html) (metadata only) is separate account-level configuration in hyperfleet Bedrock modules.
 
-1. **Cluster** — `logging = OVERRIDE`, exec log group = `.../ssm-sessions`, same CMK as both log groups.
-2. **Task role** — `logs:DescribeLogGroups`; `CreateLogStream` / `DescribeLogStreams` / `PutLogEvents` on **exec log group only**; KMS `GenerateDataKey` / `Decrypt` on the shared CMK.
-3. **Caller (ECS Exec)** — KMS for encrypted exec channel (`*-zoa-access-exec-scoped` role vended on session join).
-4. **RunTask** — `EnableExecuteCommand: true` (`pkg/awsecs/client.go`).
-5. **Image** — **`script` and `cat`** (`util-linux` in `Containerfile.boundary`); startup fails if missing.
+## Platform requirements (why the image matters)
 
-**Interactive shell user:** ECS Exec always attaches as **root**; Terraform sets `ecs_exec_interactive_command` (Access Lambda env `ZOA_ECS_EXEC_COMMAND`, default `runuser -u sre -- /bin/bash -l`). ZOA Access returns it as `exec_command` on `POST /sessions/join/{id}`; the CLI passes it through to `ExecuteCommand` with no separate business logic.
+ECS Exec logging to CloudWatch requires:
 
-**Exec credentials:** On join, Access assumes `${regional_id}-zoa-access-exec-scoped` with a session policy limiting `ecs:ExecuteCommand` to that session's task ARN and returns `exec_credentials` to the CLI. The laptop does not assume `OrganizationAccountAccessRole` for exec.
+1. Cluster **execute command** logging override → `.../ssm-sessions` with the shared CMK.
+2. Task role permissions on the **exec log group** and KMS.
+3. **`EnableExecuteCommand: true`** on `RunTask` (`pkg/awsecs/client.go`).
+4. Boundary image includes **`script`** and **`cat`** (`util-linux` in `Containerfile.boundary`); entrypoint fails closed if missing.
 
-**Skel files:** `/home/sre/.claude/CLAUDE.md`, baked `.claude/settings.json`, and runtime `.claude/ZOA_SESSION.md` — use `ls -la /home/sre` (plain `ls` hides dotfiles).
+**Interactive user:** ECS Exec attaches as **root**; Access returns `exec_command` (default `runuser -u sre -- /bin/bash -l`) on join. **Exec credentials** are vended by Access (`*-zoa-access-exec-scoped` role); the laptop does not use broad deployment-admin roles for Exec.
 
-**Historical root cause (eph, Oct 2026):** Missing `script` in the image; exec transcripts never shipped. Secondary confusion: only reading `container/...` streams in the container log group.
+## Task stop (`stopTimeout`)
 
-## What exec logging captures
+Fargate **`stopTimeout` is 30 seconds** on the boundary task definition. There is no persistent home volume — only time for SIGTERM and log agent flush after terminate or reaper `StopTask`.
 
-- Interactive shell and commands run from it (including `zoa run` stdout in the session).
-- Claude Code TUI: partial terminal capture; Bedrock payloads → optional [model invocation logging](https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html) (`enable_bedrock_logging`), not ECS exec logs.
+## Find the Exec log stream (not the ZOA `session_id`)
 
-## Task stop behavior (`stopTimeout`)
+CloudWatch Insights filters on **`@logStream`**, which is named after the **ECS Exec session id** — **not** the ZOA boundary **`session_id`** (DynamoDB UUID on the session row / shell prompt).
 
-Fargate `stopTimeout` is **30 seconds** (same scale as the default Kubernetes `terminationGracePeriodSeconds` and the Fargate platform default). ZOA boundary has no persistent home volume or shutdown sync — only a grace period for SIGTERM and CloudWatch agent flush after the session ends.
+| Identifier                           | Example                                          | Use in CloudWatch?                                                               |
+| ------------------------------------ | ------------------------------------------------ | -------------------------------------------------------------------------------- |
+| ZOA **`session_id`**                 | `bcacb5bb-041b-47e7-b839-6ad619f6a91b`           | **No** — identifies the boundary session in DynamoDB and `zoa session terminate` |
+| **Exec join** (`exec_session_ids[]`) | `ecs-execute-command-jtopofu479y5el3kgiob9ubti4` | **Yes** — value in JSON is the full **`@logStream`** name (prefix included)      |
 
-## Verification after deploy
+**One ZOA boundary session, many Exec joins:** every successful **`zoa session join`** (including reconnects after disconnect) creates a **new** SSM/ECS Exec session id. Access appends each id to **`exec_session_ids`** on the session row when join registration succeeds (`POST .../sessions/exec-attached/{session-id}`). Each id is a **separate** log stream in the **same** `/ecs/<cluster_id>/zoa-boundary/ssm-sessions` log group.
 
-1. Rebuild boundary image; bump image tag; `terraform apply` (new log group `.../ssm-sessions`, task definition, IAM).
-2. New session → join → `echo ZOA_EXEC_LOG_TEST-$(date -u +%s)` → exit session → wait ~1–2 min.
-3. **Exec (expect hit here):**
-
-```bash
-aws logs tail "/ecs/<cluster_id>/zoa-boundary/ssm-sessions" --follow
-
-aws logs describe-log-streams \
-  --log-group-name "/ecs/<cluster_id>/zoa-boundary/ssm-sessions" \
-  --order-by LastEventTime --descending --max-items 10
-```
-
-4. **Container (startup only):**
+**From the laptop (audit view):**
 
 ```bash
-aws logs tail "/ecs/<cluster_id>/zoa-boundary" --since 1h
-# streams: container/zoa-boundary/<task-id>
+zoa session history <deployment> -o json
 ```
 
-5. Optional: [amazon-ecs-exec-checker](https://github.com/aws-containers/amazon-ecs-exec-checker).
+Pick the boundary session row, then an entry from **`exec_session_ids`** for the join you care about (most recent is usually last in the array). Table output shows a truncated id or `N joins` — use **JSON** for the full exec id.
 
-## ZOA TA audit (separate)
+Also note **`target_cluster`** on that row (e.g. `eph-3cfd072c-regional`) so you open the correct log group and Grafana datasource (RC vs MC account).
 
-`zoa run` is recorded in **ZOA DynamoDB audit** regardless of CloudWatch exec logging. Use exec logs for shell forensics; use ZOA audit for TA proof.
+If **`exec_session_ids`** is empty but you know a join happened, the CLI may have failed exec-attached registration; the reaper can still use SSM/CW directly — operators may need AWS console/SSM session history for that join id.
 
-## DynamoDB `execSessionIds` (forensics)
+## Viewing session logs in Grafana Explorer
 
-After each successful `ExecuteCommand`, the laptop CLI calls Access **`POST /api/v0/sessions/exec-attached/{session-id}`** to append the SSM session id (CloudWatch stream name). This is **optional for reaper idle logic** — the Worker correlates activity via SSM and CloudWatch directly. See [session reaper](boundary-session-reaper.md).
+Operators use **Grafana** with the **CloudWatch Logs** datasource for the target AWS account — not the AWS CLI on a laptop (and not from inside the boundary container for fleet-wide review).
+
+Same pattern as [Lambda logs in observability](../observability.md#viewing-logs-in-grafana-explorer):
+
+1. Open **Grafana → Explore**.
+2. Select the **CloudWatch Logs** datasource for the account that runs the boundary task:
+   - **RC boundary** → regional cluster account datasource.
+   - **MC boundary** → management cluster account datasource.
+3. **Search log groups** and open:
+
+   ```
+   /ecs/<cluster_id>/zoa-boundary/ssm-sessions
+   ```
+
+4. Run **CloudWatch Logs Insights** with an **exact** `@logStream` match. Copy a string from **`exec_session_ids`** in `zoa session history -o json` (stored as the full stream name):
+
+   ```
+   fields @timestamp, @message
+   | filter @logStream = "ecs-execute-command-jtopofu479y5el3kgiob9ubti4"
+   | sort @timestamp asc
+   | limit 10000
+   ```
+
+5. Example — recent activity across **all** Exec streams on the cluster (narrow the time range in Explore first):
+
+   ```
+   fields @timestamp, @logStream, @message
+   | filter @logStream like /ecs-execute-command-/
+   | sort @timestamp desc
+   | limit 100
+   ```
+
+6. **Startup-only** debugging — container group:
+
+   ```
+   /ecs/<cluster_id>/zoa-boundary
+   ```
+
+   Streams: `container/zoa-boundary/<ecs-task-id>`. The ECS **task id** (not session UUID) appears in the session row as `task_id` when the task is active.
+
+**Latency:** After disconnecting Exec, PTY events often appear within **1–2 minutes**.
+
+## DynamoDB `exec_session_ids`
+
+After `ecs:ExecuteCommand`, the laptop CLI calls Access **`POST /api/v0/sessions/exec-attached/{zoa-session-id}`** to append the **Exec session id** to the boundary session row. That id is what operators use for CloudWatch forensics. Failure prints a warning but still opens the shell. Idle reaper logic does **not** depend on this field — see [session reaper](boundary-session-reaper.md).

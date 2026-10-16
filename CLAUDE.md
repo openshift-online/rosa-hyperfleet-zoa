@@ -12,21 +12,21 @@ Guidance for AI coding assistants working in this repository.
 
 ## Three pillars (read `README.md` for detail)
 
-| Pillar | Status | Role |
-|--------|--------|------|
-| **Boundary** | Shipped | Ephemeral ECS Fargate shell per target VPC; entry point for all operator work |
-| **Trusted Actions** | Shipped | Audited `zoa run` from inside the boundary; ephemeral per-execution RBAC |
-| **Break-glass** | Planned | Emergency scoped access from boundary — see `docs/break-glass/README.md` |
+| Pillar              | Status  | Role                                                                          |
+| ------------------- | ------- | ----------------------------------------------------------------------------- |
+| **Boundary**        | Shipped | Ephemeral ECS Fargate shell per target VPC; entry point for all operator work |
+| **Trusted Actions** | Shipped | Audited `zoa run` from inside the boundary; ephemeral per-execution RBAC      |
+| **Break-glass**     | Planned | Emergency scoped access from boundary — see `docs/break-glass/README.md`      |
 
 ## Architecture (short)
 
 **One Lambda image, three modes** (`HANDLER_MODE` on `zoa-lambda`):
 
-| Mode | Where | Caller | Purpose |
-|------|--------|--------|---------|
-| **access** | RC account, **no VPC** | SRE laptop (SigV4) | Sessions, targets, `ecs:RunTask` for boundary |
-| **api** | Per target VPC (RC + each MC) | Boundary task role (`ZOA_API_URL`) | TA dispatch, runs, audit, streaming downloads |
-| **worker** | Per target VPC | EventBridge + self-invoke | Reconciler, GC, **session reaper**, async TA execution |
+| Mode       | Where                         | Caller                             | Purpose                                                |
+| ---------- | ----------------------------- | ---------------------------------- | ------------------------------------------------------ |
+| **access** | RC account, **no VPC**        | SRE laptop (SigV4)                 | Sessions, targets, `ecs:RunTask` for boundary          |
+| **api**    | Per target VPC (RC + each MC) | Boundary task role (`ZOA_API_URL`) | TA dispatch, runs, audit, streaming downloads          |
+| **worker** | Per target VPC                | EventBridge + self-invoke          | Reconciler, GC, **session reaper**, async TA execution |
 
 **Three container images** from this repo: `zoa-lambda`, `zoa-runner` (async Jobs on EKS), `zoa-boundary` (operator shell).
 
@@ -42,38 +42,39 @@ Failure domains are **per target VPC** for API/Worker/boundary; **central Access
 
 Start at **`docs/README.md`**. Do not duplicate long architecture in agent prompts — link instead.
 
-| Area | Path |
-|------|------|
-| Operator workflow | `docs/guides/operator-workflow.md` |
-| Boundary | `docs/boundary/architecture.md`, `docs/boundary/container-image.md` |
-| Session design | `docs/design/boundary-identity-and-storage.md`, `docs/design/boundary-session-reaper.md`, `docs/design/boundary-session-logging.md` |
-| Laptop deployment discovery | `docs/design/deployments-discovery.md` |
-| Lambda model | `docs/architecture/lambda-model.md`, `docs/architecture/implementation.md` |
-| API / CLI | `docs/api-reference.md`, `docs/cli-reference.md` |
-| TAs | `docs/trusted-actions.md` |
-| E2E / dev | `docs/e2e-testing.md`, `docs/development.md` |
-| Platform ADR | [rosa-hyperfleet `docs/design/zoa-architecture.md`](https://github.com/openshift-online/rosa-hyperfleet/blob/main/docs/design/zoa-architecture.md) |
+| Area                        | Path                                                                                                                                               |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Operator workflow           | `docs/guides/operator-workflow.md`                                                                                                                 |
+| Boundary                    | `docs/boundary/architecture.md`, `docs/boundary/container-image.md`                                                                                |
+| Identity bridge             | `docs/design/boundary-identity-bridge.md`                                                                                                          |
+| Session reaper / logging    | `docs/design/boundary-session-reaper.md`, `docs/design/boundary-session-logging.md`                                                                |
+| Laptop deployment discovery | `docs/design/deployments-discovery.md`                                                                                                             |
+| Lambda model                | `docs/architecture/lambda-model.md`, `docs/architecture/implementation.md`                                                                         |
+| API / CLI                   | `docs/api-reference.md`, `docs/cli-reference.md`                                                                                                   |
+| TAs                         | `docs/trusted-actions.md`                                                                                                                          |
+| E2E / dev                   | `docs/e2e-testing.md`, `docs/development.md`                                                                                                       |
+| Platform ADR                | [rosa-hyperfleet `docs/design/zoa-architecture.md`](https://github.com/openshift-online/rosa-hyperfleet/blob/main/docs/design/zoa-architecture.md) |
 
 ## Key directories
 
-| Path | Purpose |
-|------|---------|
-| `cmd/zoa/` | CLI (`session`, `run`, `audit`, …) |
-| `cmd/zoa-lambda/` | Lambda entry (`HANDLER_MODE=api\|worker\|access`) |
-| `cmd/zoa-runner/` | Async Job entrypoint in target EKS |
-| `internal/cli/` | Cobra + `APIClient` / Access client for tests |
-| `internal/client/` | SigV4 HTTP to Function URLs |
-| `pkg/api/` | HTTP routes: TA plane (`api`) and session plane (`access.go`) |
-| `pkg/handler/` | Lambda event router (HTTP, schedules, execute events) |
-| `pkg/executor/` | SA/RBAC, sync impersonation, async Job dispatch |
-| `pkg/store/` | DynamoDB: executions, audit, **sessions**, targets |
-| `pkg/scheduler/` | Reconciler, GC, **reaper** (`reaper.go`) |
-| `pkg/actions/` | TA framework + implementations; `conformance_test.go` gate |
-| `pkg/boundaryexec/`, `pkg/accesscross/`, `pkg/awsecs/`, `pkg/execcreds/` | Boundary / ECS Exec / cross-account session helpers |
-| `pkg/config/` | Env config; validates mode-specific required vars |
-| `Containerfile` | `zoa-lambda` image |
-| `Containerfile.runner` | `zoa-runner` image |
-| `Containerfile.boundary` | `zoa-boundary` image |
+| Path                                                                     | Purpose                                                       |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| `cmd/zoa/`                                                               | CLI (`session`, `run`, `audit`, …)                            |
+| `cmd/zoa-lambda/`                                                        | Lambda entry (`HANDLER_MODE=api\|worker\|access`)             |
+| `cmd/zoa-runner/`                                                        | Async Job entrypoint in target EKS                            |
+| `internal/cli/`                                                          | Cobra + `APIClient` / Access client for tests                 |
+| `internal/client/`                                                       | SigV4 HTTP to Function URLs                                   |
+| `pkg/api/`                                                               | HTTP routes: TA plane (`api`) and session plane (`access.go`) |
+| `pkg/handler/`                                                           | Lambda event router (HTTP, schedules, execute events)         |
+| `pkg/executor/`                                                          | SA/RBAC, sync impersonation, async Job dispatch               |
+| `pkg/store/`                                                             | DynamoDB: executions, audit, **sessions**, targets            |
+| `pkg/scheduler/`                                                         | Reconciler, GC, **reaper** (`reaper.go`)                      |
+| `pkg/actions/`                                                           | TA framework + implementations; `conformance_test.go` gate    |
+| `pkg/boundaryexec/`, `pkg/accesscross/`, `pkg/awsecs/`, `pkg/execcreds/` | Boundary / ECS Exec / cross-account session helpers           |
+| `pkg/config/`                                                            | Env config; validates mode-specific required vars             |
+| `Containerfile`                                                          | `zoa-lambda` image                                            |
+| `Containerfile.runner`                                                   | `zoa-runner` image                                            |
+| `Containerfile.boundary`                                                 | `zoa-boundary` image                                          |
 
 ## Build & test
 
@@ -111,9 +112,9 @@ make images-push      # dev: push lambda + runner + boundary to Quay (see Makefi
 
 ## Related repositories
 
-| Repository | Contents |
-|------------|----------|
-| [rosa-hyperfleet](https://github.com/openshift-online/rosa-hyperfleet) | ZOA/boundary Terraform, image tags in `config/defaults.yaml`, rendered `deploy/` |
-| [rosa-hyperfleet-api](https://github.com/openshift-online/rosa-hyperfleet-api) | Platform API / operator (separate from ZOA) |
+| Repository                                                                     | Contents                                                                         |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| [rosa-hyperfleet](https://github.com/openshift-online/rosa-hyperfleet)         | ZOA/boundary Terraform, image tags in `config/defaults.yaml`, rendered `deploy/` |
+| [rosa-hyperfleet-api](https://github.com/openshift-online/rosa-hyperfleet-api) | Platform API / operator (separate from ZOA)                                      |
 
 When bumping images for environments: commit in **this** repo, then set `zoa_lambda_image_tag`, `zoa_runner_image_tag`, and `zoa_boundary_image_tag` in hyperfleet `config/` and run `uv run scripts/render.py`.

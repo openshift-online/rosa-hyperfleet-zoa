@@ -156,7 +156,7 @@ func (s *DynamoDBSessionStore) Get(ctx context.Context, sessionID string) (*Sess
 }
 
 // GetByTaskID is the identity bridge: ECS task UUID (STS RoleSessionName on the task role)
-// → session row → human operator. Uses GSI task-id-index (see docs/design/boundary-identity-and-storage.md).
+// → session row → human operator. Uses GSI task-id-index (see docs/design/boundary-identity-bridge.md).
 func (s *DynamoDBSessionStore) GetByTaskID(ctx context.Context, taskID string) (*Session, error) {
 	keyCond := expression.Key("taskId").Equal(expression.Value(taskID))
 	expr, err := expression.NewBuilder().WithKeyCondition(keyCond).Build()

@@ -12,13 +12,13 @@ Image: **`zoa-boundary`** (`Containerfile.boundary`). Published to Quay (`quay.i
 
 ## Shipped tools
 
-| Tool                                     | Purpose                                                                                  |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `zoa`                                    | TAs, actions, audit (API Lambda)                                                         |
-| `kubectl`                                | Future break-glass; no kubeconfig by default                                             |
-| `aws` CLI v2                             | SigV4 to Function URLs; future AWS break-glass                                           |
-| `jq`                                     | JSON from `zoa -o json`                                                                  |
-| `claude`                                 | Bedrock (`CLAUDE_CODE_USE_BEDROCK=1`); operational assist only (not customer data store) |
+| Tool         | Purpose                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------- |
+| `zoa`        | TAs, actions, audit (API Lambda)                                                         |
+| `kubectl`    | Future break-glass; no kubeconfig by default                                             |
+| `aws` CLI v2 | SigV4 to Function URLs; future AWS break-glass                                           |
+| `jq`         | JSON from `zoa -o json`                                                                  |
+| `claude`     | Bedrock (`CLAUDE_CODE_USE_BEDROCK=1`); operational assist only (not customer data store) |
 
 ### Claude Code in a boundary task
 
@@ -36,7 +36,7 @@ Image: **`zoa-boundary`** (`Containerfile.boundary`). Published to Quay (`quay.i
 - `~/.bashrc.d/10-zoa-prompt.bashrc` — two-line session prompt (`sessionId:` + `operator@zoa:`)
 - `~/.bashrc.d/15-zoa-motd.bashrc` — session info banner on login
 - `~/.bashrc.d/16-zoa-session-login.bashrc` — session context setup
-- `~/.bashrc.d/99-session-exit-reminder.bashrc` — on `exit`/Ctrl+D, prints `zoa session stop` for the laptop (task keeps running)
+- `~/.bashrc.d/99-session-exit-reminder.bashrc` — on `exit`/Ctrl+D, prints `zoa session terminate` hints for the laptop (task keeps running)
 - Entrypoint: `zoa-boundary-entrypoint.sh` — writes `ZOA_SESSION.md`, `ZOA_ACTIONS.md`, banner
 
 ## Build
@@ -54,10 +54,10 @@ Pass `VCS_REF` / `VERSION` via build-args when integrating with Konflux (see `do
 ```bash
 make test-shell   # bats tests/shell/ (requires bats-core; builds bin/zoa first)
 ```
+
 Wire into CI via openshift/release (planned).
 
 ## Related
 
 - [Session logging](../design/boundary-session-logging.md)
 - [zoa-lambda module README](https://github.com/openshift-online/rosa-hyperfleet/blob/main/terraform/modules/zoa-lambda/README.md) (boundary ECS: `boundary-ecs.tf`, `boundary-task.tf`)
-

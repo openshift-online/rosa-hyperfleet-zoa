@@ -1,6 +1,6 @@
 # ZOA Boundary — SRE access guide
 
-End-to-end flow for audited access: laptop identity → discover deployments/targets → start a boundary session → work inside the container (TAs, optional Claude) → disconnect Exec → terminate the session from the laptop. Session **terminal I/O** is recorded to CloudWatch (ECS Exec PTY); see [session logging](../design/boundary-session-logging.md#what-ecs-exec-pty-logging-is).
+End-to-end flow for audited access: laptop identity → discover deployments/targets → start a boundary session → work inside the container (TAs, optional Claude) → disconnect Exec → terminate the session from the laptop. Session **terminal I/O** is recorded to CloudWatch (ECS Exec PTY); see [session logging](../design/boundary-session-logging.md).
 
 ## Prerequisites
 
@@ -118,7 +118,7 @@ From the **laptop**:
 zoa session terminate <deployment>/<session-id>
 ```
 
-Exec disconnect flushes the **PTY transcript** to CloudWatch (often within **1–2 minutes**). Correlate streams via **`exec_session_ids`** on `zoa session history -o json` — see [Grafana Explorer](../design/boundary-session-logging.md#viewing-session-logs-in-grafana-explorer).
+Exec disconnect flushes the **PTY transcript** to CloudWatch (often within **1–2 minutes**). Each join gets its own stream: use **`exec_session_ids`** from `zoa session history -o json` (not the ZOA **`session_id`**) — see [session logging](../design/boundary-session-logging.md#find-the-exec-log-stream-not-the-zoa-session_id).
 
 ## Identity and SigV4
 
@@ -171,34 +171,17 @@ Only an SRE who passes **both** checks:
 
 Knowing a task id is **not** enough; you need a successful **join** as the session owner.
 
-### Inside the boundary: task role, operator, and Trusted Actions
+### Inside the boundary: Trusted Actions and the identity bridge
 
-**ECS task role (layer 3)** — All boundary tasks for a target share the **same IAM task role** on the task definition. The role is **not** unique per SRE. What differs per running task is the **ECS task id**, which appears as the **session name** on the task role’s assumed-role ARN when the container signs requests.
+Boundary tasks share one **ECS task role** per target; the API sees the **task id** in the SigV4 ARN, not your username. The API resolves **you** via DynamoDB (**task id → session → `operator`**). Shell env vars (`ZOA_OPERATOR`, etc.) are UX only.
 
-**`zoa` in the container** — Uses the task role via the default credential chain, signs **SigV4** to **`ZOA_API_URL`**, and sets **`X-Operator`** to **`GetCallerIdentity().Arn`** (the task-role ARN including the **task id**).
+| Where you run `zoa` | Function URL | Credentials | How **operator** is determined                           |
+| ------------------- | ------------ | ----------- | -------------------------------------------------------- |
+| Laptop (Access)     | Access       | Invoker     | Invoker ARN session name                                 |
+| Laptop (Exec)       | ECS/SSM APIs | Vended exec | Same human; one task ARN                                 |
+| Boundary container  | API          | Task role   | [Identity bridge](../design/boundary-identity-bridge.md) |
 
-**Identity bridge (how the API knows the human operator)** — The API Lambda does **not** treat `ZOA_OPERATOR` or the prompt as audit truth. On every API request it:
-
-1. Reads **`signer_arn`** from **`X-Operator`** (SigV4 caller ARN).
-2. **First:** looks up **`task-id-index`** in sessions DynamoDB using the ARN’s session name (ECS **task id** on boundary tasks).
-3. **On hit:** sets **operator** and **session id** from the session row (created at **session start** on Access with **signer_arn**, **account_id**, and human **operator**).
-4. **On miss (temporary — laptop `zoa run` today):** **operator** = username from the invoker ARN session name; **session id** empty.
-
-IAM on the Function URL decides who may call; the bridge only attributes humans. Full schema and GSI layout: [boundary identity and storage](../design/boundary-identity-and-storage.md).
-
-The SRE cannot change the ECS task id or repoint the session mapping from inside the shell. Every **`zoa run`** records **operator**, **signer_arn**, and **session_id** in execution and audit data.
-
-**`ZOA_OPERATOR` in the container env** — Set at **RunTask** for the **prompt**, `ZOA_SESSION.md`, and ergonomics. **Audit and TA attribution use the identity bridge**, not this env var.
-
-**What the task role cannot do** — Invoke **Access**, modify session rows in DynamoDB, or widen ECS/IAM. It is scoped to the **API** plane (Trusted Actions, audit reads, Bedrock where configured, exec logging, etc.).
-
-| Where you run `zoa` | Function URL         | Credentials signing SigV4    | How **operator** is determined                    |
-| ------------------- | -------------------- | ---------------------------- | ------------------------------------------------- |
-| Laptop              | **Access**           | **Invoker** role             | Username from invoker ARN session name            |
-| Laptop (Exec only)  | _(AWS ECS/SSM APIs)_ | **Vended exec-scoped** creds | Same human; policy limits to one task             |
-| Boundary container  | **API**              | **ECS task role**            | DynamoDB lookup: task id → session → **operator** |
-
-More detail: [Architecture](architecture.md) (Access vs API split).
+Full design: [Identity bridge](../design/boundary-identity-bridge.md). Control-plane split: [Boundary architecture](../boundary/architecture.md).
 
 ## Discover deployments
 
@@ -208,11 +191,11 @@ zoa deployments
 
 Central SSM only — see [§2 above](#2-discover-deployments-central-ssm-no-lambda). Column reference:
 
-| Column           | Meaning                                                                                   |
-| ---------------- | ----------------------------------------------------------------------------------------- |
+| Column           | Meaning                                                                        |
+| ---------------- | ------------------------------------------------------------------------------ |
 | **DEPLOYMENT**   | Name passed to `zoa session` and `zoa targets` (e.g. `us-east-1`, `eu-west-1`) |
-| **ACCESS URL**   | ZOA Access Lambda Function URL                                                            |
-| **INVOKER ROLE** | Role to assume before calling Access                                                      |
+| **ACCESS URL**   | ZOA Access Lambda Function URL                                                 |
+| **INVOKER ROLE** | Role to assume before calling Access                                           |
 
 ## Discover targets
 
@@ -279,4 +262,4 @@ Reaper rules (deadline / inactivity): [Session reaper](../design/boundary-sessio
 | Exec handshake fails          | `session-manager-plugin`; KMS/exec-scoped role (see [session logging](../design/boundary-session-logging.md))                                                                                                                                                       |
 | `zoa run` fails               | `ZOA_API_URL` in container; task role on API Function URL resource policy                                                                                                                                                                                           |
 | Claude / Bedrock errors       | Bedrock model enabled in account; see hyperfleet `zoa-boundary` Bedrock agreements                                                                                                                                                                                  |
-| Session transcript in Grafana | [ECS Exec logs](../design/boundary-session-logging.md#viewing-session-logs-in-grafana-explorer) — `ssm-sessions` + `exec_session_ids` from `zoa session history`; Claude TUI can look noisy but transcript is valid for forensics; use **`zoa runs`** for TA detail |
+| Session transcript in Grafana | [Exec log stream](../design/boundary-session-logging.md#viewing-session-logs-in-grafana-explorer) — `exec_session_ids[]` → `@logStream = "ecs-execute-command-…"`; one stream per join; use **`zoa runs`** for TA detail |

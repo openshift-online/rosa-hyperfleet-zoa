@@ -23,14 +23,14 @@ This document explains the timeout architecture, how values relate to each other
 
 ## Current Defaults
 
-| Parameter | Default | Where | What it controls |
-|---|---|---|---|
-| `lambda_api_timeout` | 300s | Terraform variable | API Lambda hard ceiling |
-| `lambda_worker_timeout` | 300s | Terraform variable | Worker Lambda hard ceiling |
-| `EXECUTION_DEADLINE_SECONDS` | 295s | Lambda env var | Code deadline for TA execution |
-| `RECONCILER_DEADLINE_SECONDS` | 55s | Lambda env var | Code deadline for reconciler/GC |
-| `MAX_BATCH_PER_TICK` | 30 | Lambda env var | Items per scheduled phase |
-| Per-TA `TimeoutSeconds` | 120s | Go code | Individual TA max runtime |
+| Parameter                     | Default | Where              | What it controls                |
+| ----------------------------- | ------- | ------------------ | ------------------------------- |
+| `lambda_api_timeout`          | 300s    | Terraform variable | API Lambda hard ceiling         |
+| `lambda_worker_timeout`       | 300s    | Terraform variable | Worker Lambda hard ceiling      |
+| `EXECUTION_DEADLINE_SECONDS`  | 295s    | Lambda env var     | Code deadline for TA execution  |
+| `RECONCILER_DEADLINE_SECONDS` | 55s     | Lambda env var     | Code deadline for reconciler/GC |
+| `MAX_BATCH_PER_TICK`          | 30      | Lambda env var     | Items per scheduled phase       |
+| Per-TA `TimeoutSeconds`       | 120s    | Go code            | Individual TA max runtime       |
 
 ## Constraint Rules
 
@@ -78,21 +78,27 @@ Reduce `lambda_worker_timeout` to 60s if all TAs are confirmed fast. Adjust env 
 ## How Deadlines Work in Code
 
 ### API Lambda (sync TAs)
+
 ```
 Request arrives → EXECUTION_DEADLINE_SECONDS context → Execute TA → Upload artifacts → Respond
 ```
+
 If the TA exceeds its per-TA timeout or the code deadline fires, the TA is interrupted and marked `failed`.
 
 ### Worker Lambda (scheduled routes)
+
 ```
 EventBridge trigger → RECONCILER_DEADLINE_SECONDS context → Run phase → Emit metrics → Return
 ```
+
 Each phase (reconciler/GC) checks `ctx.Err()` between items. If deadline fires mid-batch, remaining items are deferred to the next tick.
 
 ### Worker Lambda (self-invoked TA execution)
+
 ```
 Self-invoke → EXECUTION_DEADLINE_SECONDS context → Load execution → Execute TA → Update DynamoDB → Return
 ```
+
 Per-TA timeout is enforced by the executor. If the code deadline fires before TA completes, the execution is marked `failed`.
 
 ## Billing Implications

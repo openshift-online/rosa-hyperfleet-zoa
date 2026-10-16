@@ -132,15 +132,15 @@ Do **not** use `ZOA_API_URL` for session discovery—that is the **API** plane i
 
 These apply to **every** subcommand (`session`, `run`, `runs`, `audit`, …). When a flag and an env var set the same value, the **flag wins** (see [Environment variables and precedence](#environment-variables-and-precedence) for `ZOA_API_URL`, `AWS_REGION`, `ZOA_REASON`, and `ZOA_TARGET_TYPE`).
 
-| Flag                 | Short | Env var       | Description                                                                                              |
-| -------------------- | ----- | ------------- | -------------------------------------------------------------------------------------------------------- |
-| `--api-url`          |       | `ZOA_API_URL` | **API** Lambda URL (Trusted Actions). Not used for session/discovery.                                  |
-| `--deployments-region` |     | _(none)_      | Central SSM region for `/zoa/deployments` (`deployments`, `targets`, `session`; default: failover `us-east-1` → `eu-west-1`). |
-| `--access-url`       |       | _(none)_      | Direct Access URL (`targets`, `session` only); requires `--invoker-role-arn`; skips Central deployment SSM autodiscovery. |
-| `--invoker-role-arn` |       | _(none)_      | Direct Access invoker role (`targets`, `session` only); requires `--access-url`.                      |
-| `--output`           | `-o`  |               | `table` (default), `wide`, or `json`                                                                     |
-| `--region`           |       | `AWS_REGION`  | AWS region for SigV4 and custom endpoints                                                                |
-| `--help`             | `-h`  |               | Help for the current command                                                                             |
+| Flag                   | Short | Env var       | Description                                                                                                                   |
+| ---------------------- | ----- | ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `--api-url`            |       | `ZOA_API_URL` | **API** Lambda URL (Trusted Actions). Not used for session/discovery.                                                         |
+| `--deployments-region` |       | _(none)_      | Central SSM region for `/zoa/deployments` (`deployments`, `targets`, `session`; default: failover `us-east-1` → `eu-west-1`). |
+| `--access-url`         |       | _(none)_      | Direct Access URL (`targets`, `session` only); requires `--invoker-role-arn`; skips Central deployment SSM autodiscovery.     |
+| `--invoker-role-arn`   |       | _(none)_      | Direct Access invoker role (`targets`, `session` only); requires `--access-url`.                                              |
+| `--output`             | `-o`  |               | `table` (default), `wide`, or `json`                                                                                          |
+| `--region`             |       | `AWS_REGION`  | AWS region for SigV4 and custom endpoints                                                                                     |
+| `--help`               | `-h`  |               | Help for the current command                                                                                                  |
 
 ## Commands
 
@@ -148,7 +148,7 @@ These apply to **every** subcommand (`session`, `run`, `runs`, `audit`, …). Wh
 
 | Command                | Description                                                                                                                                 |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `deployments`          | List deployments from Central SSM `us-east-1` (default: deployment, region, Access URL, invoker; `-o wide` adds account ID; `-o json`)     |
+| `deployments`          | List deployments from Central SSM `us-east-1` (default: deployment, region, Access URL, invoker; `-o wide` adds account ID; `-o json`)      |
 | `targets <deployment>` | List targets (RC + MC) for a deployment (default: target, region, type, status; `-o wide` / `-o json` for VPC, subnets, ECS, API URL, etc.) |
 
 ### Boundary sessions (laptop — Access Lambda)

@@ -43,7 +43,7 @@ type IdentityResult struct {
 
 // ResolveIdentity attributes API requests to a human operator and optional boundary session.
 //
-// Design: docs/design/boundary-identity-and-storage.md
+// Design: docs/design/boundary-identity-bridge.md
 //
 //  1. Identity bridge: RoleSessionName from signer_arn is often the ECS task UUID on
 //     boundary TAs. GetByTaskID (GSI task-id-index) → operator + session_id.
